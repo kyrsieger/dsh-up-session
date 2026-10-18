@@ -13,6 +13,8 @@ window.__ModuleLoader__.load({
     /** Simplified Chinese dictionary and key source of truth. */
     const zh = {
       section: '置顶',
+      expand: '展开置顶会话',
+      collapse: '收起置顶会话',
       unpin: '取消置顶',
       unpinNamed: '取消置顶 {title}',
       openNamed: '打开 {title}',
@@ -26,6 +28,8 @@ window.__ModuleLoader__.load({
     /** English dictionary checked against the Chinese key set. */
     const en = {
       section: 'Pinned',
+      expand: 'Expand pinned sessions',
+      collapse: 'Collapse pinned sessions',
       unpin: 'Unpin',
       unpinNamed: 'Unpin {title}',
       openNamed: 'Open {title}',
@@ -39,16 +43,36 @@ window.__ModuleLoader__.load({
 
     /** Stylesheet, scoped to this plugin's own class names. */
     const CSS = [
+      // Right edge is measured at runtime from a native session row (see
+      // alignToNativeRows): arithmetic on the host's padding chain got this wrong
+      // twice, so the section copies the real geometry instead of predicting it.
       '.dshUS-mount{box-sizing:border-box;flex:none;display:flex;flex-direction:column;',
-      'padding-right:var(--dsh-session-list-edge-inset,12px);padding-left:4px;margin:0 0 4px -4px}',
+      'padding-left:4px;margin:0 0 4px -4px}',
       '.dshUS-mount[data-rail="true"]{display:none}',
       '.dshUS-root{box-sizing:border-box;display:flex;flex-direction:column;gap:2px}',
       // The header copies the host's "Workspaces" section header: same box, same
-      // 14px/20px label, same tertiary label colour.
-      '.dshUS-header{box-sizing:border-box;display:flex;align-items:center;height:36px;',
-      'margin-bottom:4px;padding-left:4px;color:var(--dsw-alias-label-tertiary);font-size:14px;',
-      'line-height:20px;overflow:hidden;user-select:none}',
-      '.dshUS-row{box-sizing:border-box;display:flex;align-items:center;gap:6px;height:32px;',
+      // 14px/20px label, same tertiary label colour. The whole row is the toggle.
+      '.dshUS-header{box-sizing:border-box;display:flex;align-items:center;gap:4px;width:100%;',
+      'height:36px;margin:0 0 4px;padding:0 4px 0 4px;border:0;background:0 0;font:inherit;',
+      'text-align:left;color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:20px;',
+      'overflow:hidden;user-select:none;cursor:pointer;border-radius:var(--dsw-radius-sm,4px)}',
+      '.dshUS-header:hover{color:var(--dsw-alias-label-secondary)}',
+      '.dshUS-header:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
+      'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:-2px}',
+      '.dshUS-label{flex:none;min-width:0;overflow:hidden;text-overflow:ellipsis;',
+      'white-space:nowrap}',
+      // A V-shaped chevron: points down when expanded, back right when collapsed,
+      // rotating on the host's own easing curve.
+      '.dshUS-arrow{flex:none;display:inline-flex;align-items:center;justify-content:center;',
+      'color:var(--dsw-alias-label-caption,currentColor);',
+      'transition:transform .15s var(--ds-ease-in-out);transform:rotate(0deg)}',
+      '.dshUS-arrow[data-open="false"]{transform:rotate(-90deg)}',
+      '@media (prefers-reduced-motion:reduce){.dshUS-arrow{transition:none}}',
+      // Row geometry copied from the host's session row: zero gap (the host's
+      // row sets `gap:0`), the title's own 4/6px margins around it, and a
+      // pin-sized 16x20 trailing box with a 6px lead — the same box the host's
+      // own pinned marker occupies.
+      '.dshUS-row{box-sizing:border-box;display:flex;align-items:center;gap:0;height:32px;',
       'padding:0 8px;border-radius:var(--dsw-radius-md,8px);cursor:pointer;font:inherit;',
       'font-size:14px;line-height:20px;color:var(--dsw-alias-label-primary);background:0 0;',
       'border:0;text-align:left;width:100%}',
@@ -59,13 +83,16 @@ window.__ModuleLoader__.load({
       '.dshUS-row:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:-2px}',
       '.dshUS-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;',
-      'font-size:14px;line-height:20px}',
-      '.dshUS-time{flex:none;color:var(--dsw-alias-label-tertiary);font-size:10px;line-height:16px}',
-      '.dshUS-unpin{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;',
-      'height:28px;padding:0;border:0;border-radius:var(--dsw-radius-sm,4px);cursor:pointer;',
-      'background:0 0;color:var(--dsw-alias-label-caption,currentColor)}',
-      '.dshUS-unpin:hover{background:var(--dsw-alias-interactive-bg-hover);',
-      'color:var(--dsw-alias-label-primary)}',
+      'margin:0 6px 0 4px;font-size:14px;line-height:20px}',
+      '.dshUS-time{flex:none;margin:0;color:var(--dsw-alias-label-tertiary);font-size:10px;',
+      'line-height:16px}',
+      '.dshUS-unpin{box-sizing:border-box;flex:none;display:inline-flex;align-items:center;',
+      'justify-content:center;width:16px;height:20px;margin-left:6px;padding:0;border:0;',
+      'border-radius:var(--dsw-radius-xs,2px);cursor:pointer;background:0 0;',
+      'color:var(--dsw-alias-label-caption,currentColor)}',
+      '.dshUS-unpin:hover{color:var(--dsw-alias-label-primary)}',
+      '.dshUS-unpin:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
+      'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:1px}',
     ].join('');
 
     /**
@@ -99,6 +126,34 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /**
+     * The host's own V-shaped chevron, copied from the Client artifact so the
+     * section matches without importing a Client package.
+     * @param props - `open` turns it from pointing down to pointing right.
+     * @returns the chevron element.
+     */
+    function ChevronGlyph({ open }) {
+      return h(
+        'span',
+        { className: 'dshUS-arrow', 'data-open': open ? 'true' : 'false' },
+        h(
+          'svg',
+          {
+            width: 14,
+            height: 14,
+            viewBox: '0 0 16 16',
+            fill: 'none',
+            xmlns: 'http://www.w3.org/2000/svg',
+            'aria-hidden': 'true',
+            strokeWidth: 1,
+          },
+          h('path', {
+            d: 'M4 6L7.29289 9.29289C7.68342 9.68342 8.31658 9.68342 8.70711 9.29289L12 6',
+            stroke: 'currentColor',
+          }),
+        ),
+      );
+    }
     /** Normalize a Session activity stamp to epoch milliseconds; absent means oldest. */
     function toMillis(value) {
       if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
@@ -133,7 +188,7 @@ window.__ModuleLoader__.load({
      * @returns the portal, or null when nothing is pinned.
      */
     function PinnedSection(props) {
-      const { host, open, unpin, t, useWorkspaces, useSessions, usePanelInfo } = props;
+      const { host, open: openSession, unpin, t, useWorkspaces, useSessions, usePanelInfo } = props;
       const pinnedSessionIds = useWorkspaces((state) => state.pinnedSessionIds);
       const archivedSessionIds = useWorkspaces((state) => state.archivedSessionIds);
       const workspaces = useWorkspaces((state) => state.items);
@@ -144,6 +199,11 @@ window.__ModuleLoader__.load({
       const currentId = panelActive
         ? undefined
         : Object.values(sessions.byId).find((session) => (session.retainedBy?.mainView ?? 0) > 0)?.id;
+      // Expanded by default; the choice lasts for this mount. Nothing is
+      // persisted, so a reload returns to the default and no stale collapse can
+      // hide the section without the user knowing why.
+      const [expanded, setExpanded] = React.useState(true);
+      const toggleExpanded = () => setExpanded((value) => !value);
 
       const rows = React.useMemo(() => {
         const archived = new Set(archivedSessionIds);
@@ -177,27 +237,40 @@ window.__ModuleLoader__.load({
       const body = h(
         'section',
         { className: 'dshUS-root', 'aria-label': t('section') },
-        h('div', { className: 'dshUS-header' }, h('span', null, t('section'))),
-        rows.map((row) =>
-          h(
-            'div',
-            {
-              key: row.id,
-              className: row.id === currentId ? 'dshUS-row dshUS-current' : 'dshUS-row',
-              role: 'button',
-              tabIndex: 0,
-              'aria-current': row.id === currentId ? 'true' : undefined,
-              title: row.workspace === '' ? row.title : `${row.title} · ${row.workspace}`,
-              'aria-label': t('openNamed', { title: row.title }),
-              onClick: () => open(row.id),
-              onKeyDown: (event) => {
-                if (event.key !== 'Enter' && event.key !== ' ') return;
-                event.preventDefault();
-                open(row.id);
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'dshUS-header',
+            'aria-expanded': expanded,
+            'aria-label': expanded ? t('collapse') : t('expand'),
+            title: expanded ? t('collapse') : t('expand'),
+            onClick: toggleExpanded,
+          },
+          h('span', { className: 'dshUS-label' }, t('section')),
+          h(ChevronGlyph, { open: expanded }),
+        ),
+        expanded &&
+          rows.map((row) =>
+            h(
+              'div',
+              {
+                key: row.id,
+                className: row.id === currentId ? 'dshUS-row dshUS-current' : 'dshUS-row',
+                role: 'button',
+                tabIndex: 0,
+                'aria-current': row.id === currentId ? 'true' : undefined,
+                title: row.workspace === '' ? row.title : `${row.title} · ${row.workspace}`,
+                'aria-label': t('openNamed', { title: row.title }),
+                onClick: () => openSession(row.id),
+                onKeyDown: (event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                  event.preventDefault();
+                  openSession(row.id);
+                },
               },
-            },
-            h('span', { className: 'dshUS-title' }, row.title),
-            h('span', { className: 'dshUS-time' }, relativeTime(row.updatedAt, now, t)),
+              h('span', { className: 'dshUS-title' }, row.title),
+              h('span', { className: 'dshUS-time' }, relativeTime(row.updatedAt, now, t)),
             h(
               'button',
               {
@@ -239,6 +312,29 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * Copy the right edge of a native session row onto the section, so the two
+     * stop on the same line without predicting the host's padding chain (which
+     * arithmetic got wrong twice). Measured, not assumed.
+     * @param host - the section's mount node.
+     */
+    function alignToNativeRows(host) {
+      const row = document.querySelector('[data-slot="sidebar.workspaces"] [data-row-key^="session:"]');
+      if (!(row instanceof Element)) return;
+      const rowRect = row.getBoundingClientRect();
+      const hostRect = host.getBoundingClientRect();
+      if (rowRect.width <= 0 || hostRect.width <= 0) return;
+      const style = getComputedStyle(host);
+      const leftPad = parseFloat(style.paddingLeft) || 0;
+      // Width the host's rows would need to end exactly where the native row ends.
+      const needed = rowRect.right - hostRect.left - leftPad;
+      if (!Number.isFinite(needed) || needed < 0) return;
+      // Solve the padding that leaves exactly that width for the rows.
+      const padding = Math.max(0, host.clientWidth - leftPad - needed);
+      if (Math.abs(padding - (parseFloat(style.paddingRight) || 0)) < 0.5) return;
+      host.style.paddingRight = `${padding}px`;
+    }
+
+    /**
      * Keep the host node immediately before the workspace slot's anchor. The
      * workspaces seat lives in the sidebar's column flex container, so a sibling
      * inserted there takes its own space and pushes the browser down instead of
@@ -264,9 +360,11 @@ window.__ModuleLoader__.load({
           resize = new ResizeObserver((entries) => {
             const width = entries[0]?.contentRect.width ?? 0;
             host.dataset.rail = width < 200 ? 'true' : 'false';
+            alignToNativeRows(host);
           });
           resize.observe(parent);
         }
+        alignToNativeRows(host);
       };
 
       const schedule = () => {
