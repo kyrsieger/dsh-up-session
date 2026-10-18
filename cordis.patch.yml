@@ -1,0 +1,6 @@
+# Bundle patch for dsh-up-session: inserts one row. The Host half renders
+# nothing; the Client half owns the sidebar's pinned-sessions section.
+
+- insert:
+    - id: dsh-up-session
+      name: 'dsh-up-session'
