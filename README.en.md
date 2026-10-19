@@ -1,6 +1,6 @@
 # dsh-up-session
 
-English | [简体中文](./README.md)
+[简体中文](./README.md) | English
 
 A simple DeepSeek Harness sidebar plugin: it inserts a "Pinned" section above the "Workspaces" list and gathers pinned sessions from all workspaces into one place.
 
