@@ -15,6 +15,7 @@ window.__ModuleLoader__.load({
       section: '置顶',
       expand: '展开置顶会话',
       collapse: '收起置顶会话',
+      empty: '无置顶会话',
       unpin: '取消置顶',
       unpinNamed: '取消置顶 {title}',
       archive: '归档会话',
@@ -50,6 +51,7 @@ window.__ModuleLoader__.load({
       section: 'Pinned',
       expand: 'Expand pinned sessions',
       collapse: 'Collapse pinned sessions',
+      empty: 'No pinned sessions',
       unpin: 'Unpin',
       unpinNamed: 'Unpin {title}',
       archive: 'Archive session',
@@ -129,6 +131,15 @@ window.__ModuleLoader__.load({
       // The row's trailing actions sit in one group that swallows clicks, so a
       // button press never also opens the row (the host's rows do the same).
       '.dshUS-actions{flex:none;display:inline-flex;align-items:center;gap:8px;margin-left:6px}',
+      // Placeholder that fills the row the section would otherwise not draw.
+      // It spans space without any hover surface, so nothing looks clickable:
+      // the title keeps the native row's indent and the text stays at the
+      // sidebar's tertiary label colour.
+      '.dshUS-empty{box-sizing:border-box;display:flex;align-items:center;height:32px;',
+      'padding:0 8px;cursor:default}',
+      '.dshUS-emptyLabel{flex:1;min-width:0;margin:0 6px 0 4px;overflow:hidden;',
+      'text-overflow:ellipsis;white-space:nowrap;font-size:14px;line-height:20px;',
+      'color:var(--dsw-alias-label-tertiary)}',
       '.dshUS-action{box-sizing:border-box;flex:none;display:inline-flex;align-items:center;',
       'justify-content:center;width:16px;height:20px;padding:0;border:0;cursor:pointer;',
       'border-radius:var(--dsw-radius-xs,2px);background:0 0;',
@@ -341,7 +352,7 @@ window.__ModuleLoader__.load({
      * The pinned section body, rendered through a portal into the host node the
      * plugin keeps just above the workspace slot's anchor.
      * @param props - composed slot props plus the injected host and actions.
-     * @returns the portal, or null when nothing is pinned.
+     * @returns the portal, or null when there is nowhere to portal into.
      */
     function PinnedSection(props) {
       const {
@@ -402,17 +413,17 @@ window.__ModuleLoader__.load({
         return list;
       }, [pinnedSessionIds, archivedSessionIds, workspaces, sessions]);
 
-      // The question survives the section: an empty pin set leaves nothing to
-      // render in the sidebar, but a pending confirmation still has to be
-      // answerable (it portals to the frame, not to the section node).
+      // The section stays put with nothing pinned: an empty pin set renders a
+      // placeholder row instead of hiding the whole section, so the header never
+      // moves around as pins come and go. A pending confirmation still has to be
+      // answerable while that placeholder shows (it portals to the frame, not to
+      // the section node).
       const dialog = h(ArchiveConfirmDialog, {
         request: archiveRequest,
         stopAndArchive,
         onSettle: () => setArchiveRequest(null),
         t,
       });
-
-      if (rows.length === 0) return dialog;
 
       const now = Date.now();
       const body = h(
@@ -432,75 +443,81 @@ window.__ModuleLoader__.load({
           h(ChevronGlyph, { open: expanded }),
         ),
         expanded &&
-          rows.map((row) =>
-            h(
-              'div',
-              {
-                key: row.id,
-                className: row.id === currentId ? 'dshUS-row dshUS-current' : 'dshUS-row',
-                role: 'button',
-                tabIndex: 0,
-                'aria-current': row.id === currentId ? 'true' : undefined,
-                title: row.workspace === '' ? row.title : `${row.title} · ${row.workspace}`,
-                'aria-label': t('openNamed', { title: row.title }),
-                onClick: () => openSession(row.id),
-                onKeyDown: (event) => {
-                  if (event.key !== 'Enter' && event.key !== ' ') return;
-                  event.preventDefault();
-                  openSession(row.id);
-                },
-              },
-              h('span', { className: 'dshUS-title' }, row.title),
-              h('span', { className: 'dshUS-time' }, relativeTime(row.updatedAt, now, t)),
-              h(
-                'span',
-                {
-                  className: 'dshUS-actions',
-                  onClick: (event) => {
-                    event.stopPropagation();
-                  },
-                  onKeyDown: (event) => {
-                    event.stopPropagation();
-                  },
-                },
+          (rows.length === 0
+            ? h(
+                'div',
+                { className: 'dshUS-empty' },
+                h('span', { className: 'dshUS-emptyLabel' }, t('empty')),
+              )
+            : rows.map((row) =>
                 h(
-                  'button',
+                  'div',
                   {
-                    type: 'button',
-                    className: 'dshUS-action dshUS-archive',
-                    'aria-label': t('archiveNamed', { title: row.title }),
-                    title: t('archive'),
-                    onClick: () => {
-                      archive(row.id)
-                        .then((result) => {
-                          if (!result.refused) return;
-                          setArchiveRequest({
-                            sessionId: row.id,
-                            title: row.title,
-                            activity: result.activity,
-                          });
-                        })
-                        .catch((reason) => {
-                          console.warn('session archive rejected:', reason);
-                        });
+                    key: row.id,
+                    className: row.id === currentId ? 'dshUS-row dshUS-current' : 'dshUS-row',
+                    role: 'button',
+                    tabIndex: 0,
+                    'aria-current': row.id === currentId ? 'true' : undefined,
+                    title: row.workspace === '' ? row.title : `${row.title} · ${row.workspace}`,
+                    'aria-label': t('openNamed', { title: row.title }),
+                    onClick: () => openSession(row.id),
+                    onKeyDown: (event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return;
+                      event.preventDefault();
+                      openSession(row.id);
                     },
                   },
-                  h(ArchiveGlyph, { size: 14 }),
+                  h('span', { className: 'dshUS-title' }, row.title),
+                  h('span', { className: 'dshUS-time' }, relativeTime(row.updatedAt, now, t)),
+                  h(
+                    'span',
+                    {
+                      className: 'dshUS-actions',
+                      onClick: (event) => {
+                        event.stopPropagation();
+                      },
+                      onKeyDown: (event) => {
+                        event.stopPropagation();
+                      },
+                    },
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: 'dshUS-action dshUS-archive',
+                        'aria-label': t('archiveNamed', { title: row.title }),
+                        title: t('archive'),
+                        onClick: () => {
+                          archive(row.id)
+                            .then((result) => {
+                              if (!result.refused) return;
+                              setArchiveRequest({
+                                sessionId: row.id,
+                                title: row.title,
+                                activity: result.activity,
+                              });
+                            })
+                            .catch((reason) => {
+                              console.warn('session archive rejected:', reason);
+                            });
+                        },
+                      },
+                      h(ArchiveGlyph, { size: 14 }),
+                    ),
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: 'dshUS-action',
+                        'aria-label': t('unpinNamed', { title: row.title }),
+                        title: t('unpin'),
+                        onClick: () => unpin(row.id),
+                      },
+                      h(PinGlyph, { size: 14 }),
+                    ),
+                  ),
                 ),
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    className: 'dshUS-action',
-                    'aria-label': t('unpinNamed', { title: row.title }),
-                    title: t('unpin'),
-                    onClick: () => unpin(row.id),
-                  },
-                  h(PinGlyph, { size: 14 }),
-                ),
-              ),
-            ),
-          ),
+              )),
         dialog,
       );
 
