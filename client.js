@@ -331,6 +331,131 @@ window.__ModuleLoader__.load({
       return 0;
     }
 
+    /** Normalize directory separators the way the sidebar compares Workspace paths. */
+    function folderPath(path) {
+      const slashed =
+        /^[A-Za-z]:[/\\]/.test(path) || path.startsWith('\\\\') ? path.replaceAll('\\', '/') : path;
+      return slashed.replace(/\/+$/, '');
+    }
+
+    /**
+     * The nearest registered Workspace directory that contains `path`, or
+     * undefined when no other Workspace holds it. Mirrors the sidebar's own
+     * nesting rule: the longest containing registered path, compared
+     * case-sensitively and excluding the directory itself.
+     * @param path - one Workspace directory.
+     * @param paths - every registered Workspace directory.
+     * @returns the owning parent directory, if any.
+     */
+    function nearestAncestorPath(path, paths) {
+      const child = folderPath(path);
+      let owner;
+      let length = -1;
+      for (const candidate of paths) {
+        const root = folderPath(candidate);
+        if (root.length > length && child !== root && child.startsWith(`${root}/`)) {
+          owner = candidate;
+          length = root.length;
+        }
+      }
+      return owner;
+    }
+
+    /**
+     * The Workspace groups whose rows lead to `workspaceId` in Workspace Tree
+     * grouping: outermost ancestor first, the Workspace itself last. The empty
+     * key is the sidebar's "Ungrouped" bucket and has no ancestors. A flat
+     * grouped list needs only the Workspace itself, which is what the lookup
+     * returns when no other registered path contains it.
+     * @param workspaces - the sidebar's Workspace items, in list order.
+     * @param workspaceId - the Workspace that owns one pinned Session.
+     * @returns the group ids to open, outermost first.
+     */
+    function workspaceChain(workspaces, workspaceId) {
+      if (workspaceId === '') return [''];
+      const folders = workspaces.filter((workspace) => typeof workspace.path === 'string');
+      const paths = folders.map((workspace) => workspace.path);
+      const idByPath = new Map(folders.map((workspace) => [workspace.path, workspace.workspaceId]));
+      const chain = [workspaceId];
+      let workspace = folders.find((item) => item.workspaceId === workspaceId);
+      while (workspace !== undefined) {
+        const parentPath = nearestAncestorPath(workspace.path, paths);
+        if (parentPath === undefined) break;
+        const parentId = idByPath.get(parentPath);
+        if (parentId === undefined || chain.includes(parentId)) break;
+        chain.unshift(parentId);
+        workspace = folders.find((item) => item.workspaceId === parentId);
+      }
+      return chain;
+    }
+
+    /**
+     * Expand every collapsed Workspace group on the way to one Workspace, then
+     * open the Session. A plugin has no service handle on the sidebar's
+     * expansion state, so the plugin drives the host's own group toggle: a
+     * group row's click handler is the one the sidebar's header uses, and it
+     * both opens the group and saves that choice exactly as a user's click
+     * would. The Workspace's own row is always opened; an ancestor is opened
+     * only when its descendant row is missing, which is exactly the nested
+     * Workspace Tree case — a flat grouped list renders every Workspace, so no
+     * unrelated folder is unfolded there. Nothing here touches the selected-row
+     * highlight: that stays the sidebar's own `mainView` rendering.
+     * @param workspaces - the sidebar's Workspace items, in list order.
+     * @param workspaceId - the Workspace that owns the Session being opened.
+     */
+    function expandWorkspacePath(workspaces, workspaceId) {
+      // No known owner means the Workspace list has not been applied yet; the
+      // "Ungrouped" bucket would be a guess, so leave the tree alone.
+      if (workspaceId === undefined) return;
+      const chain = workspaceChain(workspaces, workspaceId);
+      if (chain.length === 0) return;
+      // Ids are opaque Host values, so rows are matched through `dataset` rather
+      // than through a selector assembled from one. No group row at all means
+      // the list is not showing a grouped tree (a folded sidebar, the flat
+      // "Last updated" view, or search results), so there is nothing to unfold.
+      const rowsIn = () =>
+        document.querySelectorAll('[data-slot="sidebar.workspaces"] [data-row-key^="workspace:"]');
+      const findRow = (key) => {
+        for (const row of rowsIn()) {
+          if (row instanceof HTMLElement && row.dataset.rowKey === workspaceRowKey(key)) return row;
+        }
+        return undefined;
+      };
+      if (rowsIn().length === 0) return;
+      // A folded ancestor renders no child rows, so the walk runs outermost
+      // first. React commits a discrete click before `dispatchEvent` returns,
+      // which makes the children's rows visible to the next lookup; should a
+      // host version commit them later, the walk repeats next frame, and each
+      // key is clicked at most once so a repeat never folds a group it opened.
+      let remaining = chain.length + 1;
+      const opened = new Set();
+      const pass = () => {
+        for (const [index, key] of chain.entries()) {
+          if (opened.has(key)) continue;
+          const row = findRow(key);
+          if (row === undefined || row.getAttribute('aria-expanded') !== 'false') continue;
+          const last = index === chain.length - 1;
+          const hidesTarget =
+            !last && chain.slice(index + 1).some((next) => findRow(next) === undefined);
+          if (!last && !hidesTarget) continue;
+          opened.add(key);
+          row.click();
+        }
+        const target = chain[chain.length - 1];
+        const targetRow = findRow(target);
+        const done = targetRow !== undefined && targetRow.getAttribute('aria-expanded') !== 'false';
+        if (done || remaining <= 0) return;
+        remaining -= 1;
+        requestAnimationFrame(pass);
+      };
+      pass();
+    }
+
+    /** The data-row-key value of one Workspace group row. */
+    function workspaceRowKey(workspaceId) {
+      return `workspace:${workspaceId}`;
+    }
+
     /** Compact relative time of one row's last activity. */
     function relativeTime(value, now, t) {
       const then = toMillis(value);
@@ -386,12 +511,20 @@ window.__ModuleLoader__.load({
       // changes the pin set) while the question is still open.
       const [archiveRequest, setArchiveRequest] = React.useState(null);
       const toggleExpanded = () => setExpanded((value) => !value);
+      // Opening a row first opens the Workspace that owns it, so the Session
+      // the sidebar marks as current is actually on screen. The open call is
+      // unchanged, so the section keeps its own `dshUS-current` highlight and
+      // the sidebar keeps its native selected row.
+      const openRow = (row) => {
+        expandWorkspacePath(workspaces, row.workspaceId);
+        openSession(row.id);
+      };
 
       const rows = React.useMemo(() => {
         const archived = new Set(archivedSessionIds);
         const owners = new Map();
         for (const workspace of workspaces) {
-          for (const id of workspace.sessionIds) owners.set(id, workspace.title);
+          for (const id of workspace.sessionIds) owners.set(id, workspace);
         }
         const byId = sessions.byId;
         const list = [];
@@ -399,10 +532,15 @@ window.__ModuleLoader__.load({
           if (archived.has(id)) continue;
           const summary = byId[id];
           if (summary === undefined) continue;
+          const owner = owners.get(id);
           list.push({
             id,
             title: summary.displayTitle || id,
-            workspace: owners.get(id) ?? '',
+            workspace: owner?.title ?? '',
+            // A known owner names its Workspace; once the list has loaded, a
+            // Session no Workspace accounts for sits in the "Ungrouped" bucket
+            // (`''`). Before that, leave it unknown so nothing is guessed.
+            workspaceId: owner?.workspaceId ?? (workspaces.length === 0 ? undefined : ''),
             updatedAt: toMillis(summary.updatedAt),
           });
         }
@@ -460,11 +598,11 @@ window.__ModuleLoader__.load({
                     'aria-current': row.id === currentId ? 'true' : undefined,
                     title: row.workspace === '' ? row.title : `${row.title} · ${row.workspace}`,
                     'aria-label': t('openNamed', { title: row.title }),
-                    onClick: () => openSession(row.id),
+                    onClick: () => openRow(row),
                     onKeyDown: (event) => {
                       if (event.key !== 'Enter' && event.key !== ' ') return;
                       event.preventDefault();
-                      openSession(row.id);
+                      openRow(row);
                     },
                   },
                   h('span', { className: 'dshUS-title' }, row.title),
