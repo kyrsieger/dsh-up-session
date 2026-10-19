@@ -8,15 +8,13 @@
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
-    "./locale/*.json": "./locale/*.json",
-    "./icon": "./icon.svg"
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
     "index.js",
     "client.js",
     "cordis.patch.yml",
-    "locale/*.json",
-    "icon.svg"
+    "locale/*.json"
   ],
   "dsh": {
     "bundle": {
