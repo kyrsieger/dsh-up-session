@@ -1,6 +1,6 @@
 # dsh-up-session
 
-[English](./README.en.md) | 简体中文
+简体中文 | [English](./README.en.md)
 
 一个简单的 DeepSeek Harness 侧边栏插件：在「工作区」列表上方插入一个「置顶」区，把分散在各个工作区里的置顶会话汇总到一处显示。
 
