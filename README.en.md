@@ -22,6 +22,16 @@ Sits between the pinned section and the workspaces, lists the sessions that are 
 
 Hovering a row reveals its archive and pin buttons. Pinned sessions appear only in the pinned section, so no conversation is listed twice.
 
+## Status markers
+
+Rows in both sections read the same live status as the sidebar's own session rows, so all three places always agree. When several states apply, the first one below wins:
+
+- **amber dot**: the session is waiting for you — an answer, an approval, or a plan review;
+- **spinner**: the session is running, either its own turn or a subagent it still has working;
+- **green dot**: the session just finished and you have not opened it yet.
+
+The marker sits at the left of the title and appears only when there is something to report, so an idle row keeps its original left edge; the archive and pin buttons still appear on hover where they always did.
+
 ## License
 
 This project is licensed under the [MIT License](./LICENSE).
