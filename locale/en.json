@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Pinned Sessions",
-    "description": "Adds a pinned section above the workspace list in the sidebar, gathering pinned sessions from every workspace."
+    "description": "Adds pinned and recent sections above the workspace list in the sidebar, gathering pinned and recent sessions, with a settings popup in each section header."
   }
 }

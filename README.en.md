@@ -22,6 +22,16 @@ Sits between the pinned section and the workspaces, lists the sessions that are 
 
 Hovering a row reveals its archive and pin buttons. Pinned sessions appear only in the pinned section, so no conversation is listed twice.
 
+## Settings
+
+Each section header carries a gear at its right edge, shown while the pointer is over the header. Clicking it opens this plugin's settings popup, styled like DSH's own settings page.
+
+There is one setting:
+
+- **Reveal the session in its workspace** (on by default): opening a session from Pinned or Recent also expands its workspace group in the sidebar so the original row is visible. Turn it off to open the session without changing which groups are expanded.
+
+The choice is stored in the current browser, applies immediately, and needs no save button.
+
 ## Status markers
 
 Rows in both sections read the same live status as the sidebar's own session rows, so all three places always agree. When several states apply, the first one below wins:

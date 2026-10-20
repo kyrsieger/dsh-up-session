@@ -22,6 +22,12 @@ window.__ModuleLoader__.load({
       recentEmpty: '无最近会话',
       showMore: '展开更多',
       showLess: '收起',
+      settings: '设置',
+      settingsTitle: '设置',
+      settingsClose: '关闭设置',
+      settingsExpandWorkspace: '展开工作区中的原会话',
+      settingsExpandWorkspaceDesc:
+        '从置顶或最近区打开会话时，同时展开它在工作区列表中的位置。关闭后只打开会话，不改变工作区的展开状态。',
       untitled: '未命名',
       pin: '置顶',
       pinned: '已置顶',
@@ -76,6 +82,12 @@ window.__ModuleLoader__.load({
       recentEmpty: 'No recent sessions',
       showMore: 'Show more',
       showLess: 'Show less',
+      settings: 'Settings',
+      settingsTitle: 'Settings',
+      settingsClose: 'Close settings',
+      settingsExpandWorkspace: 'Reveal the session in its workspace',
+      settingsExpandWorkspaceDesc:
+        'When you open a session from Pinned or Recent, also expand its workspace in the sidebar. Turn this off to open the session without changing which workspaces are expanded.',
       untitled: 'Untitled',
       pin: 'Pin',
       pinned: 'Pinned',
@@ -129,14 +141,38 @@ window.__ModuleLoader__.load({
       '.dshUS-mount[data-rail="true"]{display:none}',
       '.dshUS-root{box-sizing:border-box;display:flex;flex-direction:column;gap:2px}',
       // The header copies the host's "Workspaces" section header: same box, same
-      // 14px/20px label, same tertiary label colour. The whole row is the toggle.
+      // 14px/20px label, same tertiary label colour. The whole row is the toggle,
+      // and the settings entry floats over its right edge without taking space,
+      // so revealing it on hover never shifts the label or the chevron.
+      '.dshUS-headerRow{box-sizing:border-box;position:relative;display:flex;align-items:center;',
+      'height:36px;margin:0 0 4px}',
       '.dshUS-header{box-sizing:border-box;display:flex;align-items:center;gap:4px;width:100%;',
-      'height:36px;margin:0 0 4px;padding:0 4px 0 4px;border:0;background:0 0;font:inherit;',
+      'height:100%;margin:0;padding:0 4px 0 4px;border:0;background:0 0;font:inherit;',
       'text-align:left;color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:20px;',
       'overflow:hidden;user-select:none;cursor:pointer;border-radius:var(--dsw-radius-sm,4px)}',
-      '.dshUS-header:hover{color:var(--dsw-alias-label-secondary)}',
+      '.dshUS-header:hover,',
+      '.dshUS-headerRow:hover .dshUS-header{color:var(--dsw-alias-label-secondary)}',
       '.dshUS-header:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:-2px}',
+      // The section's settings entry: the host's own gear, kept out of the way
+      // until the header row is hovered or holds keyboard focus. It floats over
+      // the header's empty right side, so the header keeps its full hit area and
+      // nothing reflows when it appears. A touch surface never hovers, so there
+      // it stays visible, exactly as the row actions do.
+      '.dshUS-settingsButton{box-sizing:border-box;position:absolute;top:50%;right:4px;',
+      'z-index:1;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;',
+      'width:24px;height:24px;padding:0;border:0;border-radius:var(--dsw-radius-sm,4px);',
+      'background:0 0;cursor:pointer;color:var(--dsw-alias-label-tertiary);',
+      'visibility:hidden;opacity:0;transition:opacity .12s var(--ds-ease-in-out)}',
+      '.dshUS-headerRow:hover .dshUS-settingsButton,',
+      '.dshUS-header:focus-visible + .dshUS-settingsButton,',
+      '.dshUS-settingsButton:focus-visible{visibility:visible;opacity:1}',
+      '.dshUS-settingsButton:hover{background:var(--dsw-alias-interactive-bg-hover);',
+      'color:var(--dsw-alias-label-primary)}',
+      '.dshUS-settingsButton:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
+      'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:1px}',
+      '@media (prefers-reduced-motion:reduce){.dshUS-settingsButton{transition:none}}',
+      '@media (hover:none){.dshUS-settingsButton{visibility:visible;opacity:1}}',
       '.dshUS-label{flex:none;min-width:0;overflow:hidden;text-overflow:ellipsis;',
       'white-space:nowrap}',
       // A V-shaped chevron: points down when expanded, back right when collapsed,
@@ -260,6 +296,49 @@ window.__ModuleLoader__.load({
       // time and marker stay hidden with them.
       '@media (hover:none){.dshUS-actions{display:inline-flex}',
       '.dshUS-time,.dshUS-pinMark{display:none}}',
+      // The plugin's settings popup, rebuilt on the host's own settings panel:
+      // the 800px panel narrowed for a single page, the mask and elevation, the
+      // 54px header with a 28px close, and the content's 24px inset. The page
+      // itself holds one preference row with the host's 36x20 switch.
+      '.dshUS-settingsRoot{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;',
+      'justify-content:center;padding:24px}',
+      '.dshUS-settingsMask{position:absolute;inset:var(--dsh-frame-chrome-top,0px) 0 0;',
+      'background:var(--dsw-alias-bg-mask-1,rgba(0,0,0,.45));backdrop-filter:var(--dsw-mask-blur,blur(4px))}',
+      '.dshUS-settingsPanel{box-sizing:border-box;position:relative;z-index:1;display:flex;',
+      'flex-direction:column;width:min(560px,100%);max-height:100%;overflow:hidden;',
+      'border-radius:var(--dsw-radius-panel,var(--dsw-radius-lg,8px));',
+      'background:var(--dsw-alias-bg-layer-2);',
+      'box-shadow:var(--dsw-elevation-prominent,0 8px 32px rgba(0,0,0,.24));',
+      'animation:dshUS-dialogIn var(--ds-transition-duration,.15s) var(--ds-ease-in-out)}',
+      '.dshUS-settingsPanel:focus{outline:none}',
+      '.dshUS-settingsHeader{box-sizing:border-box;flex:none;display:flex;align-items:flex-start;',
+      'justify-content:space-between;gap:8px;height:54px;padding:20px 14px 8px 24px}',
+      '.dshUS-settingsTitle{margin:0;font-size:16px;line-height:24px;font-weight:500;',
+      'color:var(--dsw-alias-label-primary)}',
+      '.dshUS-settingsHeader .dshUS-dialogClose{color:var(--dsw-alias-label-primary)}',
+      '.dshUS-settingsBody{flex:1;min-height:0;padding:0 24px 24px;overflow-y:auto;',
+      'overscroll-behavior:contain}',
+      '.dshUS-settingsRow{display:flex;align-items:center;justify-content:space-between;gap:24px;',
+      'padding:16px 0;border-bottom:.5px solid var(--dsw-alias-border-l2)}',
+      '.dshUS-settingsRow:last-child{border-bottom:none}',
+      '.dshUS-settingsCopy{min-width:0}',
+      '.dshUS-settingsRowTitle{font-size:14px;line-height:20px;color:var(--dsw-alias-label-primary)}',
+      '.dshUS-settingsRowDesc{margin-top:4px;font-size:12px;line-height:18px;',
+      'color:var(--dsw-alias-label-secondary)}',
+      // The host's switch, copied from its primitives: a 36x20 track with a 16px
+      // thumb that slides on the brand surface when checked.
+      '.dshUS-switch{box-sizing:border-box;position:relative;flex:none;width:36px;height:20px;',
+      'padding:2px;border:0;border-radius:999px;corner-shape:round;',
+      'background:var(--dsw-alias-border-l3);cursor:pointer}',
+      '.dshUS-switch[aria-checked="true"]{background:var(--dsw-alias-brand-primary)}',
+      '.dshUS-switch:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
+      'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:2px}',
+      '.dshUS-switchThumb{display:block;width:16px;height:16px;border-radius:50%;corner-shape:round;',
+      'background:var(--dsw-alias-label-primary-foreground);transition:transform .12s ease}',
+      '.dshUS-switch[aria-checked="false"] .dshUS-switchThumb{',
+      'background:var(--dsw-alias-switch-thumb)}',
+      '.dshUS-switch[aria-checked="true"] .dshUS-switchThumb{transform:translate(16px)}',
+      '@media (prefers-reduced-motion:reduce){.dshUS-switchThumb{transition:none}}',
       // "Stop and archive" confirmation: the host's Modal geometry (380px panel,
       // layer-2 surface, 24px body inset) narrowed to the host's confirmation
       // width, all painted with theme tokens.
@@ -272,7 +351,7 @@ window.__ModuleLoader__.load({
       'box-shadow:var(--dsw-elevation-prominent,0 8px 32px rgba(0,0,0,.24));',
       'animation:dshUS-dialogIn var(--ds-transition-duration,.15s) var(--ds-ease-in-out)}',
       '@keyframes dshUS-dialogIn{0%{opacity:0}to{opacity:1}}',
-      '@media (prefers-reduced-motion:reduce){.dshUS-dialog{animation:none}}',
+      '@media (prefers-reduced-motion:reduce){.dshUS-dialog,.dshUS-settingsPanel{animation:none}}',
       '.dshUS-dialog:focus{outline:none}',
       '.dshUS-dialogHeader{display:flex;align-items:center;justify-content:space-between;gap:8px;',
       'padding:22px 14px 12px 24px}',
@@ -282,6 +361,8 @@ window.__ModuleLoader__.load({
       'width:28px;height:28px;border:0;border-radius:var(--dsw-radius-sm,4px);background:0 0;',
       'cursor:pointer;color:var(--dsw-alias-label-secondary)}',
       '.dshUS-dialogClose:hover{background:var(--dsw-alias-interactive-bg-hover)}',
+      '.dshUS-dialogClose:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
+      'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:1px}',
       '.dshUS-dialogBody{display:flex;flex-direction:column;min-width:0;margin-top:12px;',
       'padding:0 24px;max-height:60vh;overflow-y:auto;overscroll-behavior:contain}',
       '.dshUS-dialogDesc{margin:0;font-size:14px;line-height:22px;',
@@ -384,6 +465,37 @@ window.__ModuleLoader__.load({
         },
         h('path', { d: 'M3.5 3.5L12.5 12.5', stroke: 'currentColor' }),
         h('path', { d: 'M12.5 3.5L3.5 12.5', stroke: 'currentColor' }),
+      );
+    }
+
+    /**
+     * The host's own settings gear, copied from the primitives so the section
+     * entry matches the host's settings trigger without importing a Client
+     * package.
+     * @param props - square edge in pixels.
+     * @returns the outline gear icon.
+     */
+    function SettingsGlyph({ size }) {
+      return h(
+        'svg',
+        {
+          width: size,
+          height: size,
+          viewBox: '0 0 16 16',
+          fill: 'none',
+          xmlns: 'http://www.w3.org/2000/svg',
+          'aria-hidden': 'true',
+          strokeWidth: 1.3,
+        },
+        h('path', {
+          d: 'M8 9.75012C8.9665 9.75012 9.75 8.96662 9.75 8.00012C9.75 7.03362 8.9665 6.25012 8 6.25012C7.0335 6.25012 6.25 7.03362 6.25 8.00012C6.25 8.96662 7.0335 9.75012 8 9.75012Z',
+          stroke: 'currentColor',
+        }),
+        h('path', {
+          d: 'M13.0107 7.79377C12.9505 7.89401 12.9205 7.94413 12.9205 7.99951C12.9205 8.0549 12.9505 8.10502 13.0106 8.20528L13.9849 9.83006C14.045 9.93029 14.0751 9.9804 14.0751 10.0358C14.0751 10.0911 14.045 10.1413 13.9849 10.2415L13.0037 11.8777C12.9468 11.9726 12.9184 12.0201 12.8725 12.0461C12.8267 12.072 12.7713 12.072 12.6607 12.072H10.6704C10.5598 12.072 10.5045 12.072 10.4586 12.098C10.4128 12.1239 10.3843 12.1714 10.3274 12.2662L9.33825 13.9142C9.28133 14.009 9.25287 14.0564 9.20703 14.0823C9.16118 14.1083 9.10588 14.1083 8.99529 14.1083H7.00486C6.89426 14.1083 6.83896 14.1083 6.79312 14.0823C6.74727 14.0564 6.71881 14.009 6.6619 13.9142L5.67273 12.2662C5.61581 12.1714 5.58735 12.1239 5.54151 12.098C5.49566 12.072 5.44036 12.072 5.32977 12.072H3.33945C3.2288 12.072 3.17347 12.072 3.12761 12.0461C3.08176 12.0201 3.0533 11.9726 2.9964 11.8777L2.0152 10.2415C1.9551 10.1413 1.92505 10.0911 1.92505 10.0358C1.92505 9.9804 1.9551 9.93029 2.0152 9.83006L2.98951 8.20528C3.04963 8.10502 3.07969 8.0549 3.07969 7.99951C3.07968 7.94413 3.04961 7.89401 2.98946 7.79377L2.01529 6.17011C1.95514 6.06987 1.92507 6.01975 1.92507 5.96437C1.92506 5.90899 1.95512 5.85886 2.01524 5.7586L2.9964 4.1224C3.0533 4.0275 3.08176 3.98005 3.12761 3.95408C3.17347 3.92811 3.2288 3.92811 3.33945 3.92811H5.32977C5.44036 3.92811 5.49566 3.92811 5.54151 3.90216C5.58735 3.87621 5.61581 3.82879 5.67273 3.73397L6.6619 2.08599C6.71881 1.99116 6.74727 1.94375 6.79312 1.9178C6.83896 1.89185 6.89426 1.89185 7.00486 1.89185H8.99529C9.10588 1.89185 9.16118 1.89185 9.20703 1.9178C9.25287 1.94375 9.28133 1.99116 9.33825 2.08599L10.3274 3.73397C10.3843 3.82879 10.4128 3.87621 10.4586 3.90216C10.5045 3.92811 10.5598 3.92811 10.6704 3.92811H12.6607C12.7713 3.92811 12.8267 3.92811 12.8725 3.95408C12.9184 3.98005 12.9468 4.0275 13.0037 4.1224L13.9849 5.7586C14.045 5.85886 14.0751 5.90899 14.0751 5.96437C14.0751 6.01975 14.045 6.06987 13.9849 6.17011L13.0107 7.79377Z',
+          stroke: 'currentColor',
+          strokeMiterlimit: 10,
+        }),
       );
     }
 
@@ -618,15 +730,7 @@ window.__ModuleLoader__.load({
       // than through a selector assembled from one. No group row at all means
       // the list is not showing a grouped tree (a folded sidebar, the flat
       // "Last updated" view, or search results), so there is nothing to unfold.
-      const rowsIn = () =>
-        document.querySelectorAll('[data-slot="sidebar.workspaces"] [data-row-key^="workspace:"]');
-      const findRow = (key) => {
-        for (const row of rowsIn()) {
-          if (row instanceof HTMLElement && row.dataset.rowKey === workspaceRowKey(key)) return row;
-        }
-        return undefined;
-      };
-      if (rowsIn().length === 0) return;
+      if (workspaceRows().length === 0) return;
       // A folded ancestor renders no child rows, so the walk runs outermost
       // first. React commits a discrete click before `dispatchEvent` returns,
       // which makes the children's rows visible to the next lookup; should a
@@ -637,17 +741,17 @@ window.__ModuleLoader__.load({
       const pass = () => {
         for (const [index, key] of chain.entries()) {
           if (opened.has(key)) continue;
-          const row = findRow(key);
+          const row = findWorkspaceRow(key);
           if (row === undefined || row.getAttribute('aria-expanded') !== 'false') continue;
           const last = index === chain.length - 1;
           const hidesTarget =
-            !last && chain.slice(index + 1).some((next) => findRow(next) === undefined);
+            !last && chain.slice(index + 1).some((next) => findWorkspaceRow(next) === undefined);
           if (!last && !hidesTarget) continue;
           opened.add(key);
           row.click();
         }
         const target = chain[chain.length - 1];
-        const targetRow = findRow(target);
+        const targetRow = findWorkspaceRow(target);
         const done = targetRow !== undefined && targetRow.getAttribute('aria-expanded') !== 'false';
         if (done || remaining <= 0) return;
         remaining -= 1;
@@ -659,6 +763,54 @@ window.__ModuleLoader__.load({
     /** The data-row-key value of one Workspace group row. */
     function workspaceRowKey(workspaceId) {
       return `workspace:${workspaceId}`;
+    }
+
+    /** Every Workspace group row the sidebar currently renders. */
+    function workspaceRows() {
+      return document.querySelectorAll(
+        '[data-slot="sidebar.workspaces"] [data-row-key^="workspace:"]',
+      );
+    }
+
+    /**
+     * The rendered Workspace group row for one Workspace id, if the sidebar is
+     * showing a grouped tree.
+     * @param workspaceId - the Workspace whose group row is wanted.
+     * @returns the row, or undefined when it is not rendered.
+     */
+    function findWorkspaceRow(workspaceId) {
+      for (const row of workspaceRows()) {
+        if (row instanceof HTMLElement && row.dataset.rowKey === workspaceRowKey(workspaceId)) {
+          return row;
+        }
+      }
+      return undefined;
+    }
+
+    /**
+     * Keep a collapsed Workspace group collapsed when the reveal preference is
+     * off. The sidebar expands the group that owns the current Session whenever
+     * that group has no explicit expansion choice on record, so without this a
+     * group the user has never toggled would open on its own and defeat the
+     * preference. The group row's click handler is the sidebar's own toggle, so
+     * clicking it twice restores the visible state while leaving that explicit
+     * record; both discrete clicks flush inside this task, so no frame paints
+     * the intermediate state. An already-expanded group needs nothing: its
+     * choice is either explicit or already the state the sidebar would keep.
+     * @param workspaceId - the Workspace that owns the Session being opened.
+     */
+    function pinCollapsedWorkspace(workspaceId) {
+      if (workspaceId === undefined) return;
+      const row = findWorkspaceRow(workspaceId);
+      if (row === undefined || row.getAttribute('aria-expanded') !== 'false') return;
+      row.click();
+      row.click();
+      // Should a host version batch the pair instead of flushing each discrete
+      // click, the row would end expanded; restore it on the next frame.
+      requestAnimationFrame(() => {
+        const current = findWorkspaceRow(workspaceId);
+        if (current?.getAttribute('aria-expanded') === 'true') current.click();
+      });
     }
 
     /** Compact relative time of one row's last activity. */
@@ -680,6 +832,40 @@ window.__ModuleLoader__.load({
 
     /** How many recent rows one click reveals, and how many show at rest. */
     const RECENT_PAGE = 5;
+    /** localStorage key holding this plugin's browser-local preferences. */
+    const PREFERENCES_KEY = 'dsh-up-session/preferences.v1';
+
+    /**
+     * The plugin's preferences, read from browser storage. A missing, malformed,
+     * or unreadable record falls back to the defaults; in particular the
+     * workspace-reveal behavior is on, which is what every earlier version did.
+     * @returns the current preference values.
+     */
+    function readPreferences() {
+      const fallback = { expandWorkspaceOnOpen: true };
+      try {
+        const raw = localStorage.getItem(PREFERENCES_KEY);
+        if (raw === null) return fallback;
+        const parsed = JSON.parse(raw);
+        if (typeof parsed?.expandWorkspaceOnOpen !== 'boolean') return fallback;
+        return { expandWorkspaceOnOpen: parsed.expandWorkspaceOnOpen };
+      } catch (_reason) {
+        return fallback;
+      }
+    }
+
+    /**
+     * Persist the whole preference record. A refused write only costs the
+     * persisted choice, which the caller has already applied in memory.
+     * @param preferences - the values to store.
+     */
+    function writePreferences(preferences) {
+      try {
+        localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
+      } catch (reason) {
+        console.warn('session preference not saved:', reason);
+      }
+    }
 
     /**
      * The recent list's window for one page limit. A limit below one page still
@@ -849,6 +1035,17 @@ window.__ModuleLoader__.load({
       // the row that raised it may unmount (a sibling archive changes the pinned
       // or recent set) while the question is still open.
       const [archiveRequest, setArchiveRequest] = React.useState(null);
+      // The plugin's own settings popup and the one preference it edits. Both
+      // live at the root so either section header can open the same popup and
+      // every row reads the same value; the choice is persisted on each click.
+      const [settingsOpen, setSettingsOpen] = React.useState(false);
+      const [expandWorkspaceOnOpen, setExpandWorkspaceOnOpen] = React.useState(
+        () => readPreferences().expandWorkspaceOnOpen,
+      );
+      const changeExpandWorkspaceOnOpen = (value) => {
+        setExpandWorkspaceOnOpen(value);
+        writePreferences({ expandWorkspaceOnOpen: value });
+      };
       const raiseArchive = (row) => {
         archive(row.id)
           .then((result) => {
@@ -866,9 +1063,13 @@ window.__ModuleLoader__.load({
       // Opening a row first opens the Workspace that owns it, so the Session
       // the sidebar marks as current is actually on screen. The open call is
       // unchanged, so the sections keep their own `dshUS-current` highlight and
-      // the sidebar keeps its native selected row.
+      // the sidebar keeps its native selected row. The reveal step is the one
+      // preference: with it off, the click only opens the Session and pins the
+      // group's current collapsed state so the sidebar's own current-Session
+      // expansion cannot unfold it either.
       const openRow = (row) => {
-        expandWorkspacePath(workspaces, row.workspaceId);
+        if (expandWorkspaceOnOpen) expandWorkspacePath(workspaces, row.workspaceId);
+        else pinCollapsedWorkspace(row.workspaceId);
         openSession(row.id);
       };
 
@@ -915,8 +1116,23 @@ window.__ModuleLoader__.load({
         onSettle: () => setArchiveRequest(null),
         t,
       });
+      const settingsDialog =
+        settingsOpen &&
+        h(SettingsDialog, {
+          expandWorkspaceOnOpen,
+          onChangeExpandWorkspace: changeExpandWorkspaceOnOpen,
+          onClose: () => setSettingsOpen(false),
+          t,
+        });
 
-      const shared = { currentId, onOpen: openRow, onArchive: raiseArchive, t };
+      const shared = {
+        currentId,
+        onOpen: openRow,
+        onArchive: raiseArchive,
+        onOpenSettings: () => setSettingsOpen(true),
+        settingsOpen,
+        t,
+      };
 
       const body = h(
         React.Fragment,
@@ -931,6 +1147,7 @@ window.__ModuleLoader__.load({
           rows: recent,
           onPin: (row) => pin(row.id),
         }),
+        settingsDialog,
         dialog,
       );
 
@@ -939,23 +1156,52 @@ window.__ModuleLoader__.load({
 
     /**
      * One collapsible section header, copied from the host's "Workspaces"
-     * header: the whole row is the toggle and the chevron states the direction.
-     * @param props - the visible label, the expanded state, the toggle, and the labels naming the action.
-     * @returns the header button.
+     * header: the row itself is the toggle, the chevron states the direction,
+     * and the settings entry appears at the row's right edge on hover. The entry
+     * is a sibling of the toggle rather than a child, because a button cannot
+     * nest inside another button.
+     * @param props - the visible label, the expanded state, the toggle, the labels naming the action, and the settings entry.
+     * @returns the header row.
      */
-    function SectionHeader({ label, expanded, onToggle, expandLabel, collapseLabel }) {
+    function SectionHeader({
+      label,
+      expanded,
+      onToggle,
+      expandLabel,
+      collapseLabel,
+      onOpenSettings,
+      settingsOpen,
+      settingsLabel,
+    }) {
       return h(
-        'button',
-        {
-          type: 'button',
-          className: 'dshUS-header',
-          'aria-expanded': expanded,
-          'aria-label': expanded ? collapseLabel : expandLabel,
-          title: expanded ? collapseLabel : expandLabel,
-          onClick: onToggle,
-        },
-        h('span', { className: 'dshUS-label' }, label),
-        h(ChevronGlyph, { open: expanded }),
+        'div',
+        { className: 'dshUS-headerRow' },
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'dshUS-header',
+            'aria-expanded': expanded,
+            'aria-label': expanded ? collapseLabel : expandLabel,
+            title: expanded ? collapseLabel : expandLabel,
+            onClick: onToggle,
+          },
+          h('span', { className: 'dshUS-label' }, label),
+          h(ChevronGlyph, { open: expanded }),
+        ),
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'dshUS-settingsButton',
+            'aria-label': settingsLabel,
+            'aria-haspopup': 'dialog',
+            'aria-expanded': settingsOpen,
+            title: settingsLabel,
+            onClick: onOpenSettings,
+          },
+          h(SettingsGlyph, { size: 16 }),
+        ),
       );
     }
 
@@ -1061,7 +1307,16 @@ window.__ModuleLoader__.load({
      * recent section never has to offer.
      * @returns the section element.
      */
-    function PinnedSection({ rows, currentId, onOpen, onArchive, onUnpin, t }) {
+    function PinnedSection({
+      rows,
+      currentId,
+      onOpen,
+      onArchive,
+      onUnpin,
+      onOpenSettings,
+      settingsOpen,
+      t,
+    }) {
       // Expanded by default; the choice lasts for this mount. Nothing is
       // persisted, so a reload returns to the default and no stale collapse can
       // hide the section without the user knowing why.
@@ -1076,6 +1331,9 @@ window.__ModuleLoader__.load({
           onToggle: toggleExpanded,
           expandLabel: t('expand'),
           collapseLabel: t('collapse'),
+          onOpenSettings,
+          settingsOpen,
+          settingsLabel: t('settings'),
         }),
         expanded &&
           (rows.length === 0
@@ -1111,7 +1369,16 @@ window.__ModuleLoader__.load({
      * screen it collapses the list back to its first five.
      * @returns the section element.
      */
-    function RecentSection({ rows, currentId, onOpen, onArchive, onPin, t }) {
+    function RecentSection({
+      rows,
+      currentId,
+      onOpen,
+      onArchive,
+      onPin,
+      onOpenSettings,
+      settingsOpen,
+      t,
+    }) {
       const [expanded, setExpanded] = React.useState(true);
       // How many rows the list is allowed to show; the button below the list
       // moves it by one page, and no change to the Session set resets it, so a
@@ -1143,6 +1410,9 @@ window.__ModuleLoader__.load({
           onToggle: toggleExpanded,
           expandLabel: t('recentExpand'),
           collapseLabel: t('recentCollapse'),
+          onOpenSettings,
+          settingsOpen,
+          settingsLabel: t('settings'),
         }),
         expanded &&
           (rows.length === 0
@@ -1198,6 +1468,119 @@ window.__ModuleLoader__.load({
         default:
           return t(`archiveConfirm.other.${plural}`, { kind: entry.kind, n });
       }
+    }
+
+    /**
+     * The plugin's settings popup, built to read like the host's settings panel:
+     * a centered layer-2 panel with a 54px header and one preference row whose
+     * switch is the host's own 36x20 control. It portals to the body because the
+     * sidebar column clips its contents, and it owns no saved state: the switch
+     * writes through immediately, so closing the popup never discards a choice.
+     * @param props - the preference value, its writer, settlement, and the translator.
+     * @returns the modal layer.
+     */
+    function SettingsDialog({ expandWorkspaceOnOpen, onChangeExpandWorkspace, onClose, t }) {
+      const titleId = React.useId();
+      const descriptionId = React.useId();
+      const panel = React.useRef(null);
+      // Focus moves into the panel on open (the host's Modal does the same), and
+      // the effect puts it back on the section's settings entry on close. That
+      // entry hides when the header is not hovered and a hidden element cannot
+      // take focus, so the fallback is the always-visible section toggle beside
+      // it: keyboard users then tab once more to the revealed gear.
+      React.useEffect(() => {
+        const previous = document.activeElement;
+        panel.current?.focus();
+        return () => {
+          if (!(previous instanceof HTMLElement)) return;
+          const target =
+            getComputedStyle(previous).visibility === 'hidden'
+              ? previous.previousElementSibling
+              : previous;
+          if (target instanceof HTMLElement) target.focus();
+        };
+      }, []);
+      // Escape closes the popup while it is the top layer. The listener reads
+      // the latest close handler through the effect's dependency, so a re-render
+      // never leaves a stale one attached.
+      React.useEffect(() => {
+        const onKeyDown = (event) => {
+          if (event.key !== 'Escape') return;
+          event.preventDefault();
+          event.stopPropagation();
+          onClose();
+        };
+        document.addEventListener('keydown', onKeyDown, true);
+        return () => {
+          document.removeEventListener('keydown', onKeyDown, true);
+        };
+      }, [onClose]);
+      return createPortal(
+        h(
+          'div',
+          { className: 'dshUS-settingsRoot', role: 'presentation' },
+          h('div', { className: 'dshUS-settingsMask', 'aria-hidden': 'true', onClick: onClose }),
+          h(
+            'div',
+            {
+              ref: panel,
+              tabIndex: -1,
+              className: 'dshUS-settingsPanel',
+              role: 'dialog',
+              'aria-modal': 'true',
+              'aria-labelledby': titleId,
+            },
+            h(
+              'div',
+              { className: 'dshUS-settingsHeader' },
+              h('h2', { className: 'dshUS-settingsTitle', id: titleId }, t('settingsTitle')),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'dshUS-dialogClose',
+                  'aria-label': t('settingsClose'),
+                  title: t('settingsClose'),
+                  onClick: onClose,
+                },
+                h(CloseGlyph, { size: 14 }),
+              ),
+            ),
+            h(
+              'div',
+              { className: 'dshUS-settingsBody' },
+              h(
+                'div',
+                { className: 'dshUS-settingsRow' },
+                h(
+                  'div',
+                  { className: 'dshUS-settingsCopy' },
+                  h('div', { className: 'dshUS-settingsRowTitle' }, t('settingsExpandWorkspace')),
+                  h(
+                    'div',
+                    { className: 'dshUS-settingsRowDesc', id: descriptionId },
+                    t('settingsExpandWorkspaceDesc'),
+                  ),
+                ),
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    role: 'switch',
+                    className: 'dshUS-switch',
+                    'aria-checked': expandWorkspaceOnOpen,
+                    'aria-label': t('settingsExpandWorkspace'),
+                    'aria-describedby': descriptionId,
+                    onClick: () => onChangeExpandWorkspace(!expandWorkspaceOnOpen),
+                  },
+                  h('span', { className: 'dshUS-switchThumb' }),
+                ),
+              ),
+            ),
+          ),
+        ),
+        document.body,
+      );
     }
 
     /**
