@@ -31,6 +31,14 @@ window.__ModuleLoader__.load({
       archive: '归档会话',
       archiveNamed: '归档 {title}',
       openNamed: '打开 {title}',
+      openNamedStatus: '打开 {title}（{status}）',
+      'status.running': '进行中',
+      'status.completed': '已完成',
+      'status.waitingApproval': '等待审批',
+      'status.planReview': '计划待审',
+      'status.waitingAnswer': '等待回答',
+      'status.subagents.one': '{n} 个子智能体运行中',
+      'status.subagents.other': '{n} 个子智能体运行中',
       'archiveConfirm.title': '停止并归档此会话？',
       'archiveConfirm.desc':
         '“{title}”仍有正在进行的工作。归档会先停止这些工作并同时取消置顶；之后可在侧栏“全部对话（显示已归档）”中恢复会话，但被停止的工作不会继续，置顶也不会恢复。',
@@ -77,6 +85,14 @@ window.__ModuleLoader__.load({
       archive: 'Archive session',
       archiveNamed: 'Archive {title}',
       openNamed: 'Open {title}',
+      openNamedStatus: 'Open {title} ({status})',
+      'status.running': 'Running',
+      'status.completed': 'Completed',
+      'status.waitingApproval': 'Waiting for approval',
+      'status.planReview': 'Plan awaiting review',
+      'status.waitingAnswer': 'Waiting for answer',
+      'status.subagents.one': '{n} subagent running',
+      'status.subagents.other': '{n} subagents running',
       'archiveConfirm.title': 'Stop and archive this session?',
       'archiveConfirm.desc':
         '“{title}” still has work in progress. Archiving stops it first and also unpins the session; you can restore the session later from the “All conversations (show archived)” filter in the sidebar, but the stopped work will not resume and the pin will not come back.',
@@ -146,6 +162,38 @@ window.__ModuleLoader__.load({
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:-2px}',
       '.dshUS-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;',
       'margin:0 6px 0 4px;font-size:14px;line-height:20px}',
+      // The status cell sits at the row's leading edge, exactly where the
+      // sidebar reserves its own 16x20 slot, and appears only on a row that has
+      // something to report. An idle row renders no cell at all, so its title
+      // keeps the section's own left edge instead of the sidebar's deeper
+      // indent: the marker is what the user asked for, not a right shift on
+      // every quiet row. The relative time keeps its place, because it says
+      // when the row last moved rather than what it is doing.
+      '.dshUS-status{flex:none;display:inline-flex;align-items:center;justify-content:center;',
+      'width:16px;height:20px;color:var(--dsw-alias-label-tertiary)}',
+      // The host's ongoing loader: a 14px ring whose arc sweeps while the
+      // Session runs, drawn with the primitives' own stroke recipe and easing
+      // so both rows animate identically.
+      '.dshUS-spinner{flex:none;color:var(--dsw-alias-label-tertiary)}',
+      '.dshUS-spinnerMotion{transform-origin:center;animation:dshUS-spin 1.5s linear infinite}',
+      '.dshUS-spinnerTrack,.dshUS-spinnerArc{fill:none;stroke:currentColor;stroke-width:2;',
+      'stroke-linecap:round}',
+      '.dshUS-spinnerTrack{opacity:.25}',
+      '.dshUS-spinnerArc{stroke-dasharray:12 150;animation:dshUS-dash 1.5s ease-in-out infinite}',
+      '@keyframes dshUS-spin{to{transform:rotate(360deg)}}',
+      '@keyframes dshUS-dash{0%{stroke-dasharray:12 150;stroke-dashoffset:0}',
+      '50%{stroke-dasharray:24 150;stroke-dashoffset:-6}',
+      'to{stroke-dasharray:12 150;stroke-dashoffset:0}}',
+      // A status dot is the host's 10px box with a 20% inset circle inside it, so
+      // the mark itself is 6px: done is the success green, a pending interaction
+      // the warning amber, exactly the colours the sidebar's own StateDot paints.
+      '.dshUS-dot{position:relative;display:inline-block;flex:none;width:10px;height:10px}',
+      '.dshUS-dot:after{content:"";position:absolute;inset:20%;border-radius:50%;',
+      'corner-shape:round;background:currentColor}',
+      '.dshUS-dot[data-state="done"]{color:var(--dsw-alias-state-success-primary)}',
+      '.dshUS-dot[data-state="warning"]{color:var(--dsw-alias-state-warn-primary)}',
+      '@media (prefers-reduced-motion:reduce){.dshUS-spinnerMotion,.dshUS-spinnerArc{animation:none}',
+      '.dshUS-spinnerArc{stroke-dasharray:18 150;stroke-dashoffset:-3}}',
       '.dshUS-time{flex:none;margin:0;color:var(--dsw-alias-label-tertiary);font-size:10px;',
       'line-height:16px}',
       // The host's own pinned marker, kept on the row at rest exactly as the
@@ -367,6 +415,117 @@ window.__ModuleLoader__.load({
         ),
       );
     }
+    /** No live status at all: what an older host that publishes no status feed looks like. */
+    const NO_STATUSES = new Map();
+    /** Stand-in for a host without the status hook, so the sections still render. */
+    const useNoSessionStatus = (selector) => selector(NO_STATUSES);
+
+    /**
+     * The pending-interaction kind the sidebar renders, or undefined for a kind
+     * this plugin does not know. Mirrors the host's own closed set, so a future
+     * interaction kind never paints a marker the sidebar would not paint.
+     * @param kind - the runtime's pending-interaction classification.
+     * @returns the dictionary suffix naming that interaction, if any.
+     */
+    function pendingStatus(kind) {
+      switch (kind) {
+        case 'approval':
+          return 'waitingApproval';
+        case 'plan-review':
+          return 'planReview';
+        case 'question':
+          return 'waitingAnswer';
+        default:
+          return undefined;
+      }
+    }
+
+    /**
+     * How many of one Session's direct subagents are running, counted exactly
+     * as the sidebar counts them: the parent's persisted catalog, each child's
+     * live status winning over its list summary.
+     * @param sessions - the Session-list snapshot.
+     * @param sessionId - the parent Session.
+     * @param statuses - the Session-status snapshot.
+     * @returns the running direct-child count.
+     */
+    function runningChildCount(sessions, sessionId, statuses) {
+      const catalog = sessions.projectionsBySession?.[sessionId]?.values?.subagentCatalog;
+      if (!Array.isArray(catalog)) return 0;
+      let count = 0;
+      for (const child of catalog) {
+        const running = statuses.get(child.id)?.running ?? sessions.byId[child.id]?.running;
+        if (running === true) count += 1;
+      }
+      return count;
+    }
+
+    /**
+     * One Session's primary status, in the sidebar's own precedence: a pending
+     * interaction first, then live activity (its own turn or a running child),
+     * then an unviewed completion. An idle Session has no status, which is why
+     * its row draws no marker at all.
+     * @param sessions - the Session-list snapshot.
+     * @param statuses - the Session-status snapshot.
+     * @param sessionId - the Session to classify.
+     * @returns the primary status, or undefined while idle.
+     */
+    function sessionStatus(sessions, statuses, sessionId) {
+      const status = statuses.get(sessionId);
+      const pending = pendingStatus(status?.pendingInteraction?.kind);
+      if (pending !== undefined) return { state: 'warning', label: pending };
+      const running = status?.running ?? sessions.byId[sessionId]?.running;
+      if (running === true) return { state: 'ongoing', label: 'running' };
+      const children = runningChildCount(sessions, sessionId, statuses);
+      if (children > 0) return { state: 'ongoing', label: 'subagents', count: children };
+      if (status?.completionUnread === true) return { state: 'done', label: 'completed' };
+      return undefined;
+    }
+
+    /** The readable text of one primary status, localized by the section. */
+    function statusText(status, t) {
+      if (status.label === 'subagents') {
+        return t(status.count === 1 ? 'status.subagents.one' : 'status.subagents.other', {
+          n: status.count,
+        });
+      }
+      return t(`status.${status.label}`);
+    }
+
+    /**
+     * The Session row's leading status marker: the host's spinning ring while
+     * the Session works, otherwise the host's small state dot — the same green
+     * completion and amber pending-interaction colours the sidebar paints. The
+     * marker is decorative; the row's own label carries the status in words.
+     * @param props - the primary status and its readable text.
+     * @returns the marker element.
+     */
+    function StatusMark({ status, label }) {
+      return h(
+        'span',
+        { className: 'dshUS-status', title: label, 'aria-hidden': 'true' },
+        status.state === 'ongoing'
+          ? h(
+              'svg',
+              {
+                className: 'dshUS-spinner',
+                'data-state': 'ongoing',
+                width: 14,
+                height: 14,
+                viewBox: '0 0 24 24',
+                'aria-hidden': 'true',
+              },
+              h(
+                'g',
+                { className: 'dshUS-spinnerMotion' },
+                h('circle', { className: 'dshUS-spinnerTrack', cx: '12', cy: '12', r: '9.5' }),
+                h('circle', { className: 'dshUS-spinnerArc', cx: '12', cy: '12', r: '9.5' }),
+              ),
+            )
+          : h('span', { className: 'dshUS-dot', 'data-state': status.state }),
+      );
+    }
+
     /** Normalize a Session activity stamp to epoch milliseconds; absent means oldest. */
     function toMillis(value) {
       if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
@@ -548,9 +707,11 @@ window.__ModuleLoader__.load({
      * @param owner - the Workspace that accounts for it, if one does.
      * @param loaded - whether the Workspace list has loaded at all.
      * @param untitled - the label an untitled Session shows.
+     * @param statuses - the Session-status snapshot.
+     * @param sessions - the Session-list snapshot, read for a Session's own and child activity.
      * @returns the row.
      */
-    function sessionRow(summary, owner, loaded, untitled) {
+    function sessionRow(summary, owner, loaded, untitled, statuses, sessions) {
       return {
         id: summary.id,
         title: summary.displayTitle || untitled,
@@ -560,6 +721,10 @@ window.__ModuleLoader__.load({
         // Before that, leave it unknown so nothing is guessed.
         workspaceId: owner?.workspaceId ?? (loaded ? '' : undefined),
         updatedAt: toMillis(summary.updatedAt),
+        // Undefined while the Session is idle, and for the provisional New
+        // Session blank: the row then draws no leading marker at all, which is
+        // also how the sidebar renders both of those rows.
+        status: summary.blank ? undefined : sessionStatus(sessions, statuses, summary.id),
       };
     }
 
@@ -570,19 +735,28 @@ window.__ModuleLoader__.load({
      * @param pinnedSessionIds - the Host's pin set.
      * @param archivedSessionIds - the Host's archive set.
      * @param sessions - the Session-list snapshot.
+     * @param statuses - the Session-status snapshot.
      * @param owners - Session id to the Workspace that accounts for it.
      * @param loaded - whether the Workspace list has loaded at all.
      * @param untitled - the label an untitled Session shows.
      * @returns the rows in display order.
      */
-    function pinnedRows(pinnedSessionIds, archivedSessionIds, sessions, owners, loaded, untitled) {
+    function pinnedRows(
+      pinnedSessionIds,
+      archivedSessionIds,
+      sessions,
+      statuses,
+      owners,
+      loaded,
+      untitled,
+    ) {
       const archived = new Set(archivedSessionIds);
       const rows = [];
       for (const id of pinnedSessionIds) {
         if (archived.has(id)) continue;
         const summary = sessions.byId[id];
         if (summary === undefined) continue;
-        rows.push(sessionRow(summary, owners.get(id), loaded, untitled));
+        rows.push(sessionRow(summary, owners.get(id), loaded, untitled, statuses, sessions));
       }
       // `updatedAt` is the Session-list activity stamp the Host advances on each
       // user-authored durable message.
@@ -599,12 +773,21 @@ window.__ModuleLoader__.load({
      * @param sessions - the Session-list snapshot.
      * @param archivedSessionIds - the Host's archive set.
      * @param pinnedSessionIds - the Host's pin set.
+     * @param statuses - the Session-status snapshot.
      * @param owners - Session id to the Workspace that accounts for it.
      * @param loaded - whether the Workspace list has loaded at all.
      * @param untitled - the label an untitled Session shows.
      * @returns the rows in display order.
      */
-    function recentRows(sessions, archivedSessionIds, pinnedSessionIds, owners, loaded, untitled) {
+    function recentRows(
+      sessions,
+      archivedSessionIds,
+      pinnedSessionIds,
+      statuses,
+      owners,
+      loaded,
+      untitled,
+    ) {
       const archived = new Set(archivedSessionIds);
       const pinned = new Set(pinnedSessionIds);
       const rows = [];
@@ -613,7 +796,7 @@ window.__ModuleLoader__.load({
         if (summary === undefined) continue;
         if (summary.blank || summary.origin === 'subagent') continue;
         if (archived.has(id) || pinned.has(id)) continue;
-        rows.push(sessionRow(summary, owners.get(id), loaded, untitled));
+        rows.push(sessionRow(summary, owners.get(id), loaded, untitled, statuses, sessions));
       }
       // Equal stamps break by id, the way the sidebar's own recency order does,
       // so the list never jitters between renders.
@@ -640,12 +823,21 @@ window.__ModuleLoader__.load({
         t,
         useWorkspaces,
         useSessions,
+        useSessionStatus,
         usePanelInfo,
       } = props;
       const pinnedSessionIds = useWorkspaces((state) => state.pinnedSessionIds);
       const archivedSessionIds = useWorkspaces((state) => state.archivedSessionIds);
       const workspaces = useWorkspaces((state) => state.items);
       const sessions = useSessions((state) => state);
+      // The sidebar's own live-status feed: running turns, running direct
+      // children, pending interactions, and unviewed completions, keyed by
+      // Session id. Reading the same source is what keeps these rows in step
+      // with the workspace list rather than on a separate timer. A host that
+      // predates the feed still renders: the running flag then comes from the
+      // Session summary alone, and the other two states are simply never seen.
+      const readStatuses = useSessionStatus ?? useNoSessionStatus;
+      const statuses = readStatuses((state) => state);
       // The sidebar's own definition of "current session": the one retained by
       // the main view, and only while the Conversation (not a panel) is shown.
       const panelActive = usePanelInfo((info) => info.activePanelId !== null);
@@ -691,12 +883,30 @@ window.__ModuleLoader__.load({
       const loaded = workspaces.length > 0;
       const untitled = t('untitled');
       const pinned = React.useMemo(
-        () => pinnedRows(pinnedSessionIds, archivedSessionIds, sessions, owners, loaded, untitled),
-        [pinnedSessionIds, archivedSessionIds, sessions, owners, loaded, untitled],
+        () =>
+          pinnedRows(
+            pinnedSessionIds,
+            archivedSessionIds,
+            sessions,
+            statuses,
+            owners,
+            loaded,
+            untitled,
+          ),
+        [pinnedSessionIds, archivedSessionIds, sessions, statuses, owners, loaded, untitled],
       );
       const recent = React.useMemo(
-        () => recentRows(sessions, archivedSessionIds, pinnedSessionIds, owners, loaded, untitled),
-        [sessions, archivedSessionIds, pinnedSessionIds, owners, loaded, untitled],
+        () =>
+          recentRows(
+            sessions,
+            archivedSessionIds,
+            pinnedSessionIds,
+            statuses,
+            owners,
+            loaded,
+            untitled,
+          ),
+        [sessions, archivedSessionIds, pinnedSessionIds, statuses, owners, loaded, untitled],
       );
 
       const dialog = h(ArchiveConfirmDialog, {
@@ -755,15 +965,20 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * One Session row: title, relative time, and the trailing actions that
-     * replace the time on hover or keyboard focus. A pinned row keeps the
-     * host's own pin marker where the time would end, so a pinned row looks
-     * pinned at rest exactly as the sidebar's rows do.
+     * One Session row: an optional leading status marker, the title, the
+     * relative time, and the trailing actions that replace the time on hover or
+     * keyboard focus. A pinned row keeps the host's own pin marker where the
+     * time would end, so a pinned row looks pinned at rest exactly as the
+     * sidebar's rows do.
      * @param props - the row, the current Session id, the open handler, the trailing buttons, the pin marker, and the translator.
      * @returns the row element.
      */
     function SessionRow({ row, currentId, onOpen, actions, pinned, t }) {
       const now = Date.now();
+      // A live status is the row's own leading cell, exactly as the sidebar
+      // draws it; an idle row draws none, so quiet rows keep the section's left
+      // edge instead of the sidebar's deeper indent.
+      const statusLabel = row.status === undefined ? undefined : statusText(row.status, t);
       return h(
         'div',
         {
@@ -772,7 +987,10 @@ window.__ModuleLoader__.load({
           tabIndex: 0,
           'aria-current': row.id === currentId ? 'true' : undefined,
           title: row.workspace === '' ? row.title : `${row.title} · ${row.workspace}`,
-          'aria-label': t('openNamed', { title: row.title }),
+          'aria-label':
+            statusLabel === undefined
+              ? t('openNamed', { title: row.title })
+              : t('openNamedStatus', { title: row.title, status: statusLabel }),
           onClick: () => onOpen(row),
           onKeyDown: (event) => {
             if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -780,6 +998,8 @@ window.__ModuleLoader__.load({
             onOpen(row);
           },
         },
+        row.status !== undefined &&
+          h(StatusMark, { status: row.status, label: statusLabel }),
         h('span', { className: 'dshUS-title' }, row.title),
         h('span', { className: 'dshUS-time' }, relativeTime(row.updatedAt, now, t)),
         pinned === true &&
