@@ -7,15 +7,24 @@ window.__ModuleLoader__.load({
 
     /** Dictionary namespace owned by this plugin. */
     const NS = 'upSession';
-    /** Services required to read pin state, render, and unpin. */
+    /** Services required to read pin state, render, and pin, unpin, or archive. */
     const inject = ['slots', 'locale', 'uiWorkspace'];
 
     /** Simplified Chinese dictionary and key source of truth. */
     const zh = {
       section: '置顶',
+      recent: '最近',
       expand: '展开置顶会话',
       collapse: '收起置顶会话',
+      recentExpand: '展开最近会话',
+      recentCollapse: '收起最近会话',
       empty: '无置顶会话',
+      recentEmpty: '无最近会话',
+      showMore: '展开更多',
+      showLess: '收起',
+      untitled: '未命名',
+      pin: '置顶',
+      pinNamed: '置顶 {title}',
       unpin: '取消置顶',
       unpinNamed: '取消置顶 {title}',
       archive: '归档会话',
@@ -49,9 +58,18 @@ window.__ModuleLoader__.load({
     /** English dictionary checked against the Chinese key set. */
     const en = {
       section: 'Pinned',
+      recent: 'Recent',
       expand: 'Expand pinned sessions',
       collapse: 'Collapse pinned sessions',
+      recentExpand: 'Expand recent sessions',
+      recentCollapse: 'Collapse recent sessions',
       empty: 'No pinned sessions',
+      recentEmpty: 'No recent sessions',
+      showMore: 'Show more',
+      showLess: 'Show less',
+      untitled: 'Untitled',
+      pin: 'Pin',
+      pinNamed: 'Pin {title}',
       unpin: 'Unpin',
       unpinNamed: 'Unpin {title}',
       archive: 'Archive session',
@@ -88,7 +106,7 @@ window.__ModuleLoader__.load({
       // Right edge is measured at runtime from a native session row (see
       // alignToNativeRows): arithmetic on the host's padding chain got this wrong
       // twice, so the section copies the real geometry instead of predicting it.
-      '.dshUS-mount{box-sizing:border-box;flex:none;display:flex;flex-direction:column;',
+      '.dshUS-mount{box-sizing:border-box;flex:none;display:flex;flex-direction:column;gap:4px;',
       'padding-left:4px;margin:0 0 4px -4px}',
       '.dshUS-mount[data-rail="true"]{display:none}',
       '.dshUS-root{box-sizing:border-box;display:flex;flex-direction:column;gap:2px}',
@@ -140,31 +158,39 @@ window.__ModuleLoader__.load({
       '.dshUS-emptyLabel{flex:1;min-width:0;margin:0 6px 0 4px;overflow:hidden;',
       'text-overflow:ellipsis;white-space:nowrap;font-size:14px;line-height:20px;',
       'color:var(--dsw-alias-label-tertiary)}',
-      '.dshUS-action{box-sizing:border-box;flex:none;display:inline-flex;align-items:center;',
+      // The host's own "Show more" row: one full-width 28px text button whose
+      // label lines up with the Session titles above it.
+      '.dshUS-more{box-sizing:border-box;display:block;width:100%;height:28px;margin:0;',
+      'padding:0 12px;border:0;border-radius:var(--dsw-radius-sm,4px);background:0 0;font:inherit;',
+      'font-size:12px;line-height:18px;text-align:left;color:var(--dsw-alias-label-tertiary);',
+      'cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.dshUS-more:hover{color:var(--dsw-alias-label-secondary)}',
+      '.dshUS-more:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
+      'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:-2px}',
+      // A row's actions stay out of its resting state and appear on hover or
+      // once the row holds keyboard focus, the way the host's own session rows
+      // reveal theirs. `:focus-within` is what keeps them reachable: a button
+      // cannot be tabbed to while `display:none`, and this rule holds it visible
+      // from the row's own focus all the way onto the button.
+      '.dshUS-action{box-sizing:border-box;flex:none;display:none;align-items:center;',
       'justify-content:center;width:16px;height:20px;padding:0;border:0;cursor:pointer;',
       'border-radius:var(--dsw-radius-xs,2px);background:0 0;',
       'color:var(--dsw-alias-label-caption,currentColor)}',
+      '.dshUS-row:hover .dshUS-action,',
+      '.dshUS-row:focus-visible .dshUS-action,',
+      '.dshUS-row:focus-within .dshUS-action{display:inline-flex}',
       '.dshUS-action:hover{color:var(--dsw-alias-label-primary)}',
       '.dshUS-action:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:1px}',
-      // Archive stays out of the resting row and appears on hover or once the row
-      // holds keyboard focus, the way the host's own session rows reveal their
-      // actions. `:focus-within` is what keeps it reachable: the button cannot be
-      // tabbed to while `display:none`, and this rule holds it visible from the
-      // row's own focus all the way onto the button.
-      '.dshUS-action.dshUS-archive{display:none}',
-      '.dshUS-row:hover .dshUS-action.dshUS-archive,',
-      '.dshUS-row:focus-visible .dshUS-action.dshUS-archive,',
-      '.dshUS-row:focus-within .dshUS-action.dshUS-archive{display:inline-flex}',
-      // The relative time is what the action replaces, so it goes away under
-      // exactly the conditions that bring the action in — the host's session rows
+      // The relative time is what the actions replace, so it goes away under
+      // exactly the conditions that bring them in — the host's session rows
       // drop their time and pin marker on hover for the same reason.
       '.dshUS-row:hover .dshUS-time,',
       '.dshUS-row:focus-visible .dshUS-time,',
       '.dshUS-row:focus-within .dshUS-time{display:none}',
-      // A touch surface never hovers, so the action stays visible there and the
-      // time stays hidden with it.
-      '@media (hover:none){.dshUS-action.dshUS-archive{display:inline-flex}',
+      // A touch surface never hovers, so the actions stay visible there and the
+      // time stays hidden with them.
+      '@media (hover:none){.dshUS-action{display:inline-flex}',
       '.dshUS-time{display:none}}',
       // "Stop and archive" confirmation: the host's Modal geometry (380px panel,
       // layer-2 surface, 24px body inset) narrowed to the host's confirmation
@@ -473,16 +499,121 @@ window.__ModuleLoader__.load({
       return t('time.years', { n: Math.floor(months / 12) });
     }
 
+    /** How many recent rows one click reveals, and how many show at rest. */
+    const RECENT_PAGE = 5;
+
     /**
-     * The pinned section body, rendered through a portal into the host node the
-     * plugin keeps just above the workspace slot's anchor.
+     * The recent list's window for one page limit. A limit below one page still
+     * shows one page, so the list never shrinks under its rest size.
+     * @param rowCount - how many recent Sessions there are.
+     * @param limit - how many the list is currently allowed to show.
+     * @returns the visible row count, whether every Session is on screen, and
+     *   the limit one click installs next.
+     */
+    function recentWindow(rowCount, limit) {
+      const shown = Math.max(RECENT_PAGE, limit);
+      const allShown = shown >= rowCount;
+      return {
+        visible: Math.min(shown, rowCount),
+        allShown,
+        next: allShown ? RECENT_PAGE : shown + RECENT_PAGE,
+      };
+    }
+
+    /**
+     * One Session-list summary as one row of either section. Every row carries
+     * the same shape; only which Sessions become rows and which trailing
+     * actions they offer differ between the sections.
+     * @param summary - the Session-list summary.
+     * @param owner - the Workspace that accounts for it, if one does.
+     * @param loaded - whether the Workspace list has loaded at all.
+     * @param untitled - the label an untitled Session shows.
+     * @returns the row.
+     */
+    function sessionRow(summary, owner, loaded, untitled) {
+      return {
+        id: summary.id,
+        title: summary.displayTitle || untitled,
+        workspace: owner?.title ?? '',
+        // A known owner names its Workspace; once the list has loaded, a Session
+        // no Workspace accounts for sits in the "Ungrouped" bucket (`''`).
+        // Before that, leave it unknown so nothing is guessed.
+        workspaceId: owner?.workspaceId ?? (loaded ? '' : undefined),
+        updatedAt: toMillis(summary.updatedAt),
+      };
+    }
+
+    /**
+     * The pinned section's rows: every pinned Session that is not archived,
+     * newest activity first. Ties keep the registry's order (most recently
+     * pinned first).
+     * @param pinnedSessionIds - the Host's pin set.
+     * @param archivedSessionIds - the Host's archive set.
+     * @param sessions - the Session-list snapshot.
+     * @param owners - Session id to the Workspace that accounts for it.
+     * @param loaded - whether the Workspace list has loaded at all.
+     * @param untitled - the label an untitled Session shows.
+     * @returns the rows in display order.
+     */
+    function pinnedRows(pinnedSessionIds, archivedSessionIds, sessions, owners, loaded, untitled) {
+      const archived = new Set(archivedSessionIds);
+      const rows = [];
+      for (const id of pinnedSessionIds) {
+        if (archived.has(id)) continue;
+        const summary = sessions.byId[id];
+        if (summary === undefined) continue;
+        rows.push(sessionRow(summary, owners.get(id), loaded, untitled));
+      }
+      // `updatedAt` is the Session-list activity stamp the Host advances on each
+      // user-authored durable message.
+      rows.sort((left, right) => right.updatedAt - left.updatedAt);
+      return rows;
+    }
+
+    /**
+     * The recent section's rows: every ordinary Session that is neither pinned
+     * nor archived, newest activity first. The pinned section already holds the
+     * pinned ones, so the two sections never show one conversation twice; the
+     * provisional New Session blank and subagent children stay out exactly as
+     * the sidebar hides them.
+     * @param sessions - the Session-list snapshot.
+     * @param archivedSessionIds - the Host's archive set.
+     * @param pinnedSessionIds - the Host's pin set.
+     * @param owners - Session id to the Workspace that accounts for it.
+     * @param loaded - whether the Workspace list has loaded at all.
+     * @param untitled - the label an untitled Session shows.
+     * @returns the rows in display order.
+     */
+    function recentRows(sessions, archivedSessionIds, pinnedSessionIds, owners, loaded, untitled) {
+      const archived = new Set(archivedSessionIds);
+      const pinned = new Set(pinnedSessionIds);
+      const rows = [];
+      for (const id of sessions.ids) {
+        const summary = sessions.byId[id];
+        if (summary === undefined) continue;
+        if (summary.blank || summary.origin === 'subagent') continue;
+        if (archived.has(id) || pinned.has(id)) continue;
+        rows.push(sessionRow(summary, owners.get(id), loaded, untitled));
+      }
+      // Equal stamps break by id, the way the sidebar's own recency order does,
+      // so the list never jitters between renders.
+      rows.sort((left, right) => right.updatedAt - left.updatedAt || (left.id < right.id ? -1 : 1));
+      return rows;
+    }
+
+    /**
+     * The root of the plugin's sidebar surface: the pinned section, the recent
+     * section, and the one archive confirmation both sections can raise. It is
+     * rendered through a portal into the host node the plugin keeps just above
+     * the workspace slot's anchor.
      * @param props - composed slot props plus the injected host and actions.
      * @returns the portal, or null when there is nowhere to portal into.
      */
-    function PinnedSection(props) {
+    function SidebarSections(props) {
       const {
         host,
         open: openSession,
+        pin,
         unpin,
         archive,
         stopAndArchive,
@@ -501,61 +632,53 @@ window.__ModuleLoader__.load({
       const currentId = panelActive
         ? undefined
         : Object.values(sessions.byId).find((session) => (session.retainedBy?.mainView ?? 0) > 0)?.id;
-      // Expanded by default; the choice lasts for this mount. Nothing is
-      // persisted, so a reload returns to the default and no stale collapse can
-      // hide the section without the user knowing why.
-      const [expanded, setExpanded] = React.useState(true);
       // The archive confirm request: `null` until the Host refuses an archive
-      // because the Session still has running work. It lives at the section
-      // root because the row that raised it may unmount (a sibling archive
-      // changes the pin set) while the question is still open.
+      // because the Session still has running work. It lives at the root because
+      // the row that raised it may unmount (a sibling archive changes the pinned
+      // or recent set) while the question is still open.
       const [archiveRequest, setArchiveRequest] = React.useState(null);
-      const toggleExpanded = () => setExpanded((value) => !value);
+      const raiseArchive = (row) => {
+        archive(row.id)
+          .then((result) => {
+            if (!result.refused) return;
+            setArchiveRequest({
+              sessionId: row.id,
+              title: row.title,
+              activity: result.activity,
+            });
+          })
+          .catch((reason) => {
+            console.warn('session archive rejected:', reason);
+          });
+      };
       // Opening a row first opens the Workspace that owns it, so the Session
       // the sidebar marks as current is actually on screen. The open call is
-      // unchanged, so the section keeps its own `dshUS-current` highlight and
+      // unchanged, so the sections keep their own `dshUS-current` highlight and
       // the sidebar keeps its native selected row.
       const openRow = (row) => {
         expandWorkspacePath(workspaces, row.workspaceId);
         openSession(row.id);
       };
 
-      const rows = React.useMemo(() => {
-        const archived = new Set(archivedSessionIds);
-        const owners = new Map();
+      const owners = React.useMemo(() => {
+        const index = new Map();
         for (const workspace of workspaces) {
-          for (const id of workspace.sessionIds) owners.set(id, workspace);
+          for (const id of workspace.sessionIds) index.set(id, workspace);
         }
-        const byId = sessions.byId;
-        const list = [];
-        for (const id of pinnedSessionIds) {
-          if (archived.has(id)) continue;
-          const summary = byId[id];
-          if (summary === undefined) continue;
-          const owner = owners.get(id);
-          list.push({
-            id,
-            title: summary.displayTitle || id,
-            workspace: owner?.title ?? '',
-            // A known owner names its Workspace; once the list has loaded, a
-            // Session no Workspace accounts for sits in the "Ungrouped" bucket
-            // (`''`). Before that, leave it unknown so nothing is guessed.
-            workspaceId: owner?.workspaceId ?? (workspaces.length === 0 ? undefined : ''),
-            updatedAt: toMillis(summary.updatedAt),
-          });
-        }
-        // Last edited first: `updatedAt` is the Session-list activity stamp the
-        // Host advances on each user-authored durable message. Ties keep the
-        // registry's order (most recently pinned first).
-        list.sort((left, right) => right.updatedAt - left.updatedAt);
-        return list;
-      }, [pinnedSessionIds, archivedSessionIds, workspaces, sessions]);
+        return index;
+      }, [workspaces]);
 
-      // The section stays put with nothing pinned: an empty pin set renders a
-      // placeholder row instead of hiding the whole section, so the header never
-      // moves around as pins come and go. A pending confirmation still has to be
-      // answerable while that placeholder shows (it portals to the frame, not to
-      // the section node).
+      const loaded = workspaces.length > 0;
+      const untitled = t('untitled');
+      const pinned = React.useMemo(
+        () => pinnedRows(pinnedSessionIds, archivedSessionIds, sessions, owners, loaded, untitled),
+        [pinnedSessionIds, archivedSessionIds, sessions, owners, loaded, untitled],
+      );
+      const recent = React.useMemo(
+        () => recentRows(sessions, archivedSessionIds, pinnedSessionIds, owners, loaded, untitled),
+        [sessions, archivedSessionIds, pinnedSessionIds, owners, loaded, untitled],
+      );
+
       const dialog = h(ArchiveConfirmDialog, {
         request: archiveRequest,
         stopAndArchive,
@@ -563,103 +686,233 @@ window.__ModuleLoader__.load({
         t,
       });
 
-      const now = Date.now();
+      const shared = { currentId, onOpen: openRow, onArchive: raiseArchive, t };
+
       const body = h(
-        'section',
-        { className: 'dshUS-root', 'aria-label': t('section') },
-        h(
-          'button',
-          {
-            type: 'button',
-            className: 'dshUS-header',
-            'aria-expanded': expanded,
-            'aria-label': expanded ? t('collapse') : t('expand'),
-            title: expanded ? t('collapse') : t('expand'),
-            onClick: toggleExpanded,
-          },
-          h('span', { className: 'dshUS-label' }, t('section')),
-          h(ChevronGlyph, { open: expanded }),
-        ),
-        expanded &&
-          (rows.length === 0
-            ? h(
-                'div',
-                { className: 'dshUS-empty' },
-                h('span', { className: 'dshUS-emptyLabel' }, t('empty')),
-              )
-            : rows.map((row) =>
-                h(
-                  'div',
-                  {
-                    key: row.id,
-                    className: row.id === currentId ? 'dshUS-row dshUS-current' : 'dshUS-row',
-                    role: 'button',
-                    tabIndex: 0,
-                    'aria-current': row.id === currentId ? 'true' : undefined,
-                    title: row.workspace === '' ? row.title : `${row.title} · ${row.workspace}`,
-                    'aria-label': t('openNamed', { title: row.title }),
-                    onClick: () => openRow(row),
-                    onKeyDown: (event) => {
-                      if (event.key !== 'Enter' && event.key !== ' ') return;
-                      event.preventDefault();
-                      openRow(row);
-                    },
-                  },
-                  h('span', { className: 'dshUS-title' }, row.title),
-                  h('span', { className: 'dshUS-time' }, relativeTime(row.updatedAt, now, t)),
-                  h(
-                    'span',
-                    {
-                      className: 'dshUS-actions',
-                      onClick: (event) => {
-                        event.stopPropagation();
-                      },
-                      onKeyDown: (event) => {
-                        event.stopPropagation();
-                      },
-                    },
-                    h(
-                      'button',
-                      {
-                        type: 'button',
-                        className: 'dshUS-action dshUS-archive',
-                        'aria-label': t('archiveNamed', { title: row.title }),
-                        title: t('archive'),
-                        onClick: () => {
-                          archive(row.id)
-                            .then((result) => {
-                              if (!result.refused) return;
-                              setArchiveRequest({
-                                sessionId: row.id,
-                                title: row.title,
-                                activity: result.activity,
-                              });
-                            })
-                            .catch((reason) => {
-                              console.warn('session archive rejected:', reason);
-                            });
-                        },
-                      },
-                      h(ArchiveGlyph, { size: 14 }),
-                    ),
-                    h(
-                      'button',
-                      {
-                        type: 'button',
-                        className: 'dshUS-action',
-                        'aria-label': t('unpinNamed', { title: row.title }),
-                        title: t('unpin'),
-                        onClick: () => unpin(row.id),
-                      },
-                      h(PinGlyph, { size: 14 }),
-                    ),
-                  ),
-                ),
-              )),
+        React.Fragment,
+        null,
+        h(PinnedSection, {
+          ...shared,
+          rows: pinned,
+        }),
+        h(RecentSection, {
+          ...shared,
+          rows: recent,
+          onPin: (row) => pin(row.id),
+          onUnpin: (row) => unpin(row.id),
+        }),
         dialog,
       );
 
       return host === null ? null : createPortal(body, host);
+    }
+
+    /**
+     * One collapsible section header, copied from the host's "Workspaces"
+     * header: the whole row is the toggle and the chevron states the direction.
+     * @param props - the visible label, the expanded state, the toggle, and the labels naming the action.
+     * @returns the header button.
+     */
+    function SectionHeader({ label, expanded, onToggle, expandLabel, collapseLabel }) {
+      return h(
+        'button',
+        {
+          type: 'button',
+          className: 'dshUS-header',
+          'aria-expanded': expanded,
+          'aria-label': expanded ? collapseLabel : expandLabel,
+          title: expanded ? collapseLabel : expandLabel,
+          onClick: onToggle,
+        },
+        h('span', { className: 'dshUS-label' }, label),
+        h(ChevronGlyph, { open: expanded }),
+      );
+    }
+
+    /** The placeholder row a section shows while it holds no Session. */
+    function EmptyRow({ label }) {
+      return h('div', { className: 'dshUS-empty' }, h('span', { className: 'dshUS-emptyLabel' }, label));
+    }
+
+    /**
+     * One Session row: title, relative time, and the trailing actions that
+     * replace the time on hover or keyboard focus.
+     * @param props - the row, the current Session id, the open handler, the trailing buttons, and the translator.
+     * @returns the row element.
+     */
+    function SessionRow({ row, currentId, onOpen, actions, t }) {
+      const now = Date.now();
+      return h(
+        'div',
+        {
+          className: row.id === currentId ? 'dshUS-row dshUS-current' : 'dshUS-row',
+          role: 'button',
+          tabIndex: 0,
+          'aria-current': row.id === currentId ? 'true' : undefined,
+          title: row.workspace === '' ? row.title : `${row.title} · ${row.workspace}`,
+          'aria-label': t('openNamed', { title: row.title }),
+          onClick: () => onOpen(row),
+          onKeyDown: (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            onOpen(row);
+          },
+        },
+        h('span', { className: 'dshUS-title' }, row.title),
+        h('span', { className: 'dshUS-time' }, relativeTime(row.updatedAt, now, t)),
+        // The trailing group swallows clicks, so a button press never also
+        // opens the row (the host's rows do the same).
+        h(
+          'span',
+          {
+            className: 'dshUS-actions',
+            onClick: (event) => {
+              event.stopPropagation();
+            },
+            onKeyDown: (event) => {
+              event.stopPropagation();
+            },
+          },
+          actions.map((action) =>
+            h(
+              'button',
+              {
+                key: action.key,
+                type: 'button',
+                className: 'dshUS-action',
+                'aria-label': action.label,
+                title: action.title,
+                onClick: action.onClick,
+              },
+              action.icon,
+            ),
+          ),
+        ),
+      );
+    }
+
+    /** The archive button every row owns, built from one row's identity. */
+    function archiveAction(row, onArchive, t) {
+      return {
+        key: 'archive',
+        label: t('archiveNamed', { title: row.title }),
+        title: t('archive'),
+        icon: h(ArchiveGlyph, { size: 14 }),
+        onClick: () => onArchive(row),
+      };
+    }
+
+    /**
+     * The pinned section: every pinned Session across all Workspaces, newest
+     * activity first. Its trailing action unpins, which is the one state the
+     * recent section never has to offer.
+     * @returns the section element.
+     */
+    function PinnedSection({ rows, currentId, onOpen, onArchive, onUnpin, t }) {
+      // Expanded by default; the choice lasts for this mount. Nothing is
+      // persisted, so a reload returns to the default and no stale collapse can
+      // hide the section without the user knowing why.
+      const [expanded, setExpanded] = React.useState(true);
+      const toggleExpanded = () => setExpanded((value) => !value);
+      return h(
+        'section',
+        { className: 'dshUS-root', 'aria-label': t('section') },
+        h(SectionHeader, {
+          label: t('section'),
+          expanded,
+          onToggle: toggleExpanded,
+          expandLabel: t('expand'),
+          collapseLabel: t('collapse'),
+        }),
+        expanded &&
+          (rows.length === 0
+            ? h(EmptyRow, { label: t('empty') })
+            : rows.map((row) =>
+                h(SessionRow, {
+                  key: row.id,
+                  row,
+                  currentId,
+                  onOpen,
+                  t,
+                  actions: [
+                    archiveAction(row, onArchive, t),
+                    {
+                      key: 'unpin',
+                      label: t('unpinNamed', { title: row.title }),
+                      title: t('unpin'),
+                      icon: h(PinGlyph, { size: 14 }),
+                      onClick: () => onUnpin(row),
+                    },
+                  ],
+                }),
+              )),
+      );
+    }
+
+    /**
+     * The recent section: ordinary Sessions that are not pinned, newest
+     * activity first, revealed five at a time. The header collapses the whole
+     * section; the footer button pages the list, and once every Session is on
+     * screen it collapses the list back to its first five.
+     * @returns the section element.
+     */
+    function RecentSection({ rows, currentId, onOpen, onArchive, onPin, t }) {
+      const [expanded, setExpanded] = React.useState(true);
+      // How many rows the list is allowed to show; the button below the list
+      // moves it by one page, and no change to the Session set resets it, so a
+      // new message elsewhere never folds a list the user opened.
+      const [limit, setLimit] = React.useState(RECENT_PAGE);
+      const toggleExpanded = () => setExpanded((value) => !value);
+      const page = recentWindow(rows.length, limit);
+      const visible = rows.slice(0, page.visible);
+      const pager =
+        rows.length > RECENT_PAGE
+          ? h(
+              'button',
+              {
+                type: 'button',
+                className: 'dshUS-more',
+                'aria-expanded': page.allShown,
+                title: page.allShown ? t('showLess') : t('showMore'),
+                onClick: () => setLimit(page.next),
+              },
+              page.allShown ? t('showLess') : t('showMore'),
+            )
+          : null;
+      return h(
+        'section',
+        { className: 'dshUS-root', 'aria-label': t('recent') },
+        h(SectionHeader, {
+          label: t('recent'),
+          expanded,
+          onToggle: toggleExpanded,
+          expandLabel: t('recentExpand'),
+          collapseLabel: t('recentCollapse'),
+        }),
+        expanded &&
+          (rows.length === 0
+            ? h(EmptyRow, { label: t('recentEmpty') })
+            : visible.map((row) =>
+                h(SessionRow, {
+                  key: row.id,
+                  row,
+                  currentId,
+                  onOpen,
+                  t,
+                  actions: [
+                    archiveAction(row, onArchive, t),
+                    {
+                      key: 'pin',
+                      label: t('pinNamed', { title: row.title }),
+                      title: t('pin'),
+                      icon: h(PinGlyph, { size: 14 }),
+                      onClick: () => onPin(row),
+                    },
+                  ],
+                }),
+              )),
+        expanded && pager,
+      );
     }
 
     /**
@@ -898,7 +1151,8 @@ window.__ModuleLoader__.load({
      * Keep the host node immediately before the workspace slot's anchor. The
      * workspaces seat lives in the sidebar's column flex container, so a sibling
      * inserted there takes its own space and pushes the browser down instead of
-     * covering it. Hiding in the collapsed rail mirrors the shell's own rule.
+     * covering it. Both sections share that node and stack inside it. Hiding in
+     * the collapsed rail mirrors the shell's own rule.
      * @param host - the container the portal renders into.
      * @returns the disposer that detaches the node and its observers.
      */
@@ -947,7 +1201,7 @@ window.__ModuleLoader__.load({
       };
     }
 
-    /** Contribute the pinned section above the workspace list. */
+    /** Contribute the pinned and recent sections above the workspace list. */
     function apply(ctx) {
       ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'up-session: dictionaries');
       const t = ctx.locale.bind(NS);
@@ -964,6 +1218,13 @@ window.__ModuleLoader__.load({
         host,
         open: (sessionId) => {
           ctx.uiWorkspace.openSession(sessionId);
+        },
+        // Pin and unpin go through the same hop the sidebar's own row actions
+        // use; a failure stays in the log, like an unpin failure always did.
+        pin: (sessionId) => {
+          ctx.uiWorkspace.pinSession(sessionId).catch((reason) => {
+            console.warn('session pin rejected:', reason);
+          });
         },
         unpin: (sessionId) => {
           ctx.uiWorkspace.unpinSession(sessionId).catch((reason) => {
@@ -998,7 +1259,7 @@ window.__ModuleLoader__.load({
             locale: NS,
             inject: injected,
           },
-          PinnedSection,
+          SidebarSections,
         ),
       );
     }
