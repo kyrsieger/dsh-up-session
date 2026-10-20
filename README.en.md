@@ -26,11 +26,15 @@ Hovering a row reveals its archive and pin buttons. Pinned sessions appear only 
 
 Each section header carries a gear at its right edge, shown while the pointer is over the header. Clicking it opens this plugin's settings popup, styled like DSH's own settings page.
 
-There is one setting:
+You can also open the same settings popup from the sidebar via **Plugins → Installed plugins → Pinned Sessions**, then click **Open settings** on the plugin detail page.
 
+There are three settings:
+
+- **Show Pinned** (on by default): show or hide the entire Pinned section.
+- **Show Recent** (on by default): show or hide the entire Recent section. Both lists can be turned off together and enabled again through **Open settings** on the native plugin detail page.
 - **Reveal the session in its workspace** (on by default): opening a session from Pinned or Recent also expands its workspace group in the sidebar so the original row is visible. Turn it off to open the session without changing which groups are expanded.
 
-The choice is stored in the current browser, applies immediately, and needs no save button.
+Settings are stored in the current browser, apply immediately, and need no save button.
 
 ## Status markers
 
