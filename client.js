@@ -694,12 +694,12 @@ window.__ModuleLoader__.load({
         h(PinnedSection, {
           ...shared,
           rows: pinned,
+          onUnpin: (row) => unpin(row.id),
         }),
         h(RecentSection, {
           ...shared,
           rows: recent,
           onPin: (row) => pin(row.id),
-          onUnpin: (row) => unpin(row.id),
         }),
         dialog,
       );
