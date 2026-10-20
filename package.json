@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Adds a pinned-sessions section above the workspace list in the DSH sidebar.",
+  "description": "Adds pinned and recent session sections above the workspace list in the DSH sidebar, with a small settings popup.",
   "license": "MIT",
   "exports": {
     ".": "./index.js",
