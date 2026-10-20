@@ -24,7 +24,13 @@ window.__ModuleLoader__.load({
       showLess: '收起',
       settings: '设置',
       settingsTitle: '设置',
+      settingsOpen: '打开设置',
+      settingsEntryDesc: '管理列表显示和打开会话时的工作区展开行为。',
       settingsClose: '关闭设置',
+      settingsShowPinned: '显示置顶',
+      settingsShowPinnedDesc: '在侧边栏显示置顶会话列表。',
+      settingsShowRecent: '显示最近',
+      settingsShowRecentDesc: '在侧边栏显示最近会话列表。',
       settingsExpandWorkspace: '展开工作区中的原会话',
       settingsExpandWorkspaceDesc:
         '从置顶或最近区打开会话时，同时展开它在工作区列表中的位置。关闭后只打开会话，不改变工作区的展开状态。',
@@ -84,7 +90,13 @@ window.__ModuleLoader__.load({
       showLess: 'Show less',
       settings: 'Settings',
       settingsTitle: 'Settings',
+      settingsOpen: 'Open settings',
+      settingsEntryDesc: 'Manage list visibility and workspace expansion when opening sessions.',
       settingsClose: 'Close settings',
+      settingsShowPinned: 'Show Pinned',
+      settingsShowPinnedDesc: 'Show the pinned session list in the sidebar.',
+      settingsShowRecent: 'Show Recent',
+      settingsShowRecentDesc: 'Show the recent session list in the sidebar.',
       settingsExpandWorkspace: 'Reveal the session in its workspace',
       settingsExpandWorkspaceDesc:
         'When you open a session from Pinned or Recent, also expand its workspace in the sidebar. Turn this off to open the session without changing which workspaces are expanded.',
@@ -331,6 +343,7 @@ window.__ModuleLoader__.load({
       'padding:2px;border:0;border-radius:999px;corner-shape:round;',
       'background:var(--dsw-alias-border-l3);cursor:pointer}',
       '.dshUS-switch[aria-checked="true"]{background:var(--dsw-alias-brand-primary)}',
+      '.dshUS-switch:disabled{cursor:not-allowed;opacity:.4}',
       '.dshUS-switch:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:2px}',
       '.dshUS-switchThumb{display:block;width:16px;height:16px;border-radius:50%;corner-shape:round;',
@@ -842,13 +855,16 @@ window.__ModuleLoader__.load({
      * @returns the current preference values.
      */
     function readPreferences() {
-      const fallback = { expandWorkspaceOnOpen: true };
+      const fallback = { expandWorkspaceOnOpen: true, showPinned: true, showRecent: true };
       try {
         const raw = localStorage.getItem(PREFERENCES_KEY);
         if (raw === null) return fallback;
         const parsed = JSON.parse(raw);
-        if (typeof parsed?.expandWorkspaceOnOpen !== 'boolean') return fallback;
-        return { expandWorkspaceOnOpen: parsed.expandWorkspaceOnOpen };
+        const preferences = { ...fallback };
+        for (const key of Object.keys(fallback)) {
+          if (typeof parsed?.[key] === 'boolean') preferences[key] = parsed[key];
+        }
+        return preferences;
       } catch (_reason) {
         return fallback;
       }
@@ -1011,6 +1027,7 @@ window.__ModuleLoader__.load({
         useSessions,
         useSessionStatus,
         usePanelInfo,
+        settingsEvents,
       } = props;
       const pinnedSessionIds = useWorkspaces((state) => state.pinnedSessionIds);
       const archivedSessionIds = useWorkspaces((state) => state.archivedSessionIds);
@@ -1035,16 +1052,23 @@ window.__ModuleLoader__.load({
       // the row that raised it may unmount (a sibling archive changes the pinned
       // or recent set) while the question is still open.
       const [archiveRequest, setArchiveRequest] = React.useState(null);
-      // The plugin's own settings popup and the one preference it edits. Both
+      // The plugin's own settings popup and the preferences it edits. Both
       // live at the root so either section header can open the same popup and
       // every row reads the same value; the choice is persisted on each click.
       const [settingsOpen, setSettingsOpen] = React.useState(false);
-      const [expandWorkspaceOnOpen, setExpandWorkspaceOnOpen] = React.useState(
-        () => readPreferences().expandWorkspaceOnOpen,
-      );
-      const changeExpandWorkspaceOnOpen = (value) => {
-        setExpandWorkspaceOnOpen(value);
-        writePreferences({ expandWorkspaceOnOpen: value });
+      React.useEffect(() => {
+        const openSettings = () => setSettingsOpen(true);
+        settingsEvents.addEventListener('open', openSettings);
+        return () => settingsEvents.removeEventListener('open', openSettings);
+      }, [settingsEvents]);
+      const [preferences, setPreferences] = React.useState(readPreferences);
+      const { expandWorkspaceOnOpen, showPinned, showRecent } = preferences;
+      React.useEffect(() => writePreferences(preferences), [preferences]);
+      const changePreference = (key, value) => {
+        setPreferences((previous) => {
+          const next = { ...previous, [key]: value };
+          return next;
+        });
       };
       const raiseArchive = (row) => {
         archive(row.id)
@@ -1119,8 +1143,8 @@ window.__ModuleLoader__.load({
       const settingsDialog =
         settingsOpen &&
         h(SettingsDialog, {
-          expandWorkspaceOnOpen,
-          onChangeExpandWorkspace: changeExpandWorkspaceOnOpen,
+          preferences,
+          onChangePreference: changePreference,
           onClose: () => setSettingsOpen(false),
           t,
         });
@@ -1137,12 +1161,12 @@ window.__ModuleLoader__.load({
       const body = h(
         React.Fragment,
         null,
-        h(PinnedSection, {
+        showPinned && h(PinnedSection, {
           ...shared,
           rows: pinned,
           onUnpin: (row) => unpin(row.id),
         }),
-        h(RecentSection, {
+        showRecent && h(RecentSection, {
           ...shared,
           rows: recent,
           onPin: (row) => pin(row.id),
@@ -1470,19 +1494,44 @@ window.__ModuleLoader__.load({
       }
     }
 
+    /** Entry on this bundle's native Plugins detail page, sharing the sidebar popup. */
+    function PluginSettingsEntry({ t, onOpenSettings }) {
+      return h(
+        'div',
+        { className: 'dshUS-settingsRow' },
+        h(
+          'div',
+          { className: 'dshUS-settingsCopy' },
+          h('div', { className: 'dshUS-settingsRowTitle' }, t('settingsTitle')),
+          h('div', { className: 'dshUS-settingsRowDesc' }, t('settingsEntryDesc')),
+        ),
+        h(
+          'button',
+          { type: 'button', className: 'dshUS-button dshUS-buttonOutline', onClick: onOpenSettings },
+          t('settingsOpen'),
+        ),
+      );
+    }
+
     /**
      * The plugin's settings popup, built to read like the host's settings panel:
-     * a centered layer-2 panel with a 54px header and one preference row whose
+     * a centered layer-2 panel with a 54px header and preference rows whose
      * switch is the host's own 36x20 control. It portals to the body because the
      * sidebar column clips its contents, and it owns no saved state: the switch
      * writes through immediately, so closing the popup never discards a choice.
      * @param props - the preference value, its writer, settlement, and the translator.
      * @returns the modal layer.
      */
-    function SettingsDialog({ expandWorkspaceOnOpen, onChangeExpandWorkspace, onClose, t }) {
+    function SettingsDialog({ preferences, onChangePreference, onClose, t }) {
       const titleId = React.useId();
       const descriptionId = React.useId();
       const panel = React.useRef(null);
+      const settings = [
+        { key: 'showPinned', label: 'settingsShowPinned', description: 'settingsShowPinnedDesc' },
+        { key: 'showRecent', label: 'settingsShowRecent', description: 'settingsShowRecentDesc' },
+        { key: 'expandWorkspaceOnOpen', label: 'settingsExpandWorkspace',
+          description: 'settingsExpandWorkspaceDesc' },
+      ];
       // Focus moves into the panel on open (the host's Modal does the same), and
       // the effect puts it back on the section's settings entry on close. That
       // entry hides when the header is not hovered and a hidden element cannot
@@ -1549,17 +1598,17 @@ window.__ModuleLoader__.load({
             h(
               'div',
               { className: 'dshUS-settingsBody' },
-              h(
+              ...settings.map((setting) => h(
                 'div',
-                { className: 'dshUS-settingsRow' },
+                { className: 'dshUS-settingsRow', key: setting.key },
                 h(
                   'div',
                   { className: 'dshUS-settingsCopy' },
-                  h('div', { className: 'dshUS-settingsRowTitle' }, t('settingsExpandWorkspace')),
+                  h('div', { className: 'dshUS-settingsRowTitle' }, t(setting.label)),
                   h(
                     'div',
-                    { className: 'dshUS-settingsRowDesc', id: descriptionId },
-                    t('settingsExpandWorkspaceDesc'),
+                    { className: 'dshUS-settingsRowDesc', id: descriptionId + setting.key },
+                    t(setting.description),
                   ),
                 ),
                 h(
@@ -1568,14 +1617,14 @@ window.__ModuleLoader__.load({
                     type: 'button',
                     role: 'switch',
                     className: 'dshUS-switch',
-                    'aria-checked': expandWorkspaceOnOpen,
-                    'aria-label': t('settingsExpandWorkspace'),
-                    'aria-describedby': descriptionId,
-                    onClick: () => onChangeExpandWorkspace(!expandWorkspaceOnOpen),
+                    'aria-checked': preferences[setting.key],
+                    'aria-label': t(setting.label),
+                    'aria-describedby': descriptionId + setting.key,
+                    onClick: () => onChangePreference(setting.key, !preferences[setting.key]),
                   },
                   h('span', { className: 'dshUS-switchThumb' }),
                 ),
-              ),
+              )),
             ),
           ),
         ),
@@ -1854,9 +1903,24 @@ window.__ModuleLoader__.load({
       host.dataset.dshUpSession = '';
       host.className = 'dshUS-mount';
       ctx.effect(() => mountHost(host), 'up-session: sidebar section host');
+      // Both entry surfaces send requests to the single sidebar-owned dialog.
+      const settingsEvents = new EventTarget();
+
+      ctx.slots.inject('plugins.bundle.config', () =>
+        ctx.slots.register(
+          {
+            name: 'plugins.bundle.config',
+            key: 'dsh-up-session',
+            locale: NS,
+            inject: () => ({ onOpenSettings: () => settingsEvents.dispatchEvent(new Event('open')) }),
+          },
+          PluginSettingsEntry,
+        ),
+      );
 
       const injected = () => ({
         host,
+        settingsEvents,
         open: (sessionId) => {
           ctx.uiWorkspace.openSession(sessionId);
         },
