@@ -24,6 +24,7 @@ window.__ModuleLoader__.load({
       showLess: '收起',
       untitled: '未命名',
       pin: '置顶',
+      pinned: '已置顶',
       pinNamed: '置顶 {title}',
       unpin: '取消置顶',
       unpinNamed: '取消置顶 {title}',
@@ -69,6 +70,7 @@ window.__ModuleLoader__.load({
       showLess: 'Show less',
       untitled: 'Untitled',
       pin: 'Pin',
+      pinned: 'Pinned',
       pinNamed: 'Pin {title}',
       unpin: 'Unpin',
       unpinNamed: 'Unpin {title}',
@@ -146,9 +148,23 @@ window.__ModuleLoader__.load({
       'margin:0 6px 0 4px;font-size:14px;line-height:20px}',
       '.dshUS-time{flex:none;margin:0;color:var(--dsw-alias-label-tertiary);font-size:10px;',
       'line-height:16px}',
+      // The host's own pinned marker, kept on the row at rest exactly as the
+      // sidebar keeps its marker on a pinned Session: same 16px box, same 6px
+      // lead, same caption colour. It is the trailing cell of a pinned row, so
+      // the title is measured against it even while the actions are hidden —
+      // dropping it would widen the title past the sidebar's and hide the
+      // ellipsis the sidebar draws. Hovering swaps it for the row's actions,
+      // the way the sidebar swaps its marker for its menu.
+      '.dshUS-pinMark{flex:none;display:inline-flex;align-items:center;justify-content:center;',
+      'width:16px;height:20px;margin-left:6px;color:var(--dsw-alias-label-caption,currentColor)}',
       // The row's trailing actions sit in one group that swallows clicks, so a
       // button press never also opens the row (the host's rows do the same).
-      '.dshUS-actions{flex:none;display:inline-flex;align-items:center;gap:8px;margin-left:6px}',
+      // The group hides as a whole rather than each button: `display:none`
+      // removes its margin too, so a row whose trailing cells are all absent
+      // ends with the time flush against the row edge, as the host's own rows
+      // do. Showing the group on the row's focus is what keeps its buttons
+      // reachable, since a `display:none` button cannot be tabbed to.
+      '.dshUS-actions{flex:none;display:none;align-items:center;gap:8px;margin-left:6px}',
       // Placeholder that fills the row the section would otherwise not draw.
       // It spans space without any hover surface, so nothing looks clickable:
       // the title keeps the native row's indent and the text stays at the
@@ -169,29 +185,33 @@ window.__ModuleLoader__.load({
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:-2px}',
       // A row's actions stay out of its resting state and appear on hover or
       // once the row holds keyboard focus, the way the host's own session rows
-      // reveal theirs. `:focus-within` is what keeps them reachable: a button
-      // cannot be tabbed to while `display:none`, and this rule holds it visible
-      // from the row's own focus all the way onto the button.
-      '.dshUS-action{box-sizing:border-box;flex:none;display:none;align-items:center;',
+      // reveal theirs. `:focus-within` is what keeps them reachable: the group
+      // cannot be tabbed into while `display:none`, and this rule holds it
+      // visible from the row's own focus all the way onto the buttons.
+      '.dshUS-action{box-sizing:border-box;flex:none;display:inline-flex;align-items:center;',
       'justify-content:center;width:16px;height:20px;padding:0;border:0;cursor:pointer;',
       'border-radius:var(--dsw-radius-xs,2px);background:0 0;',
       'color:var(--dsw-alias-label-caption,currentColor)}',
-      '.dshUS-row:hover .dshUS-action,',
-      '.dshUS-row:focus-visible .dshUS-action,',
-      '.dshUS-row:focus-within .dshUS-action{display:inline-flex}',
+      '.dshUS-row:hover .dshUS-actions,',
+      '.dshUS-row:focus-visible .dshUS-actions,',
+      '.dshUS-row:focus-within .dshUS-actions{display:inline-flex}',
       '.dshUS-action:hover{color:var(--dsw-alias-label-primary)}',
       '.dshUS-action:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:1px}',
-      // The relative time is what the actions replace, so it goes away under
-      // exactly the conditions that bring them in — the host's session rows
-      // drop their time and pin marker on hover for the same reason.
+      // The relative time and the pinned marker are what the actions replace, so
+      // they go away under exactly the conditions that bring the actions in —
+      // the host's session rows drop their time and pin marker on hover for the
+      // same reason. With both gone the actions keep the row's trailing edge.
       '.dshUS-row:hover .dshUS-time,',
       '.dshUS-row:focus-visible .dshUS-time,',
-      '.dshUS-row:focus-within .dshUS-time{display:none}',
+      '.dshUS-row:focus-within .dshUS-time,',
+      '.dshUS-row:hover .dshUS-pinMark,',
+      '.dshUS-row:focus-visible .dshUS-pinMark,',
+      '.dshUS-row:focus-within .dshUS-pinMark{display:none}',
       // A touch surface never hovers, so the actions stay visible there and the
-      // time stays hidden with them.
-      '@media (hover:none){.dshUS-action{display:inline-flex}',
-      '.dshUS-time{display:none}}',
+      // time and marker stay hidden with them.
+      '@media (hover:none){.dshUS-actions{display:inline-flex}',
+      '.dshUS-time,.dshUS-pinMark{display:none}}',
       // "Stop and archive" confirmation: the host's Modal geometry (380px panel,
       // layer-2 surface, 24px body inset) narrowed to the host's confirmation
       // width, all painted with theme tokens.
@@ -736,11 +756,13 @@ window.__ModuleLoader__.load({
 
     /**
      * One Session row: title, relative time, and the trailing actions that
-     * replace the time on hover or keyboard focus.
-     * @param props - the row, the current Session id, the open handler, the trailing buttons, and the translator.
+     * replace the time on hover or keyboard focus. A pinned row keeps the
+     * host's own pin marker where the time would end, so a pinned row looks
+     * pinned at rest exactly as the sidebar's rows do.
+     * @param props - the row, the current Session id, the open handler, the trailing buttons, the pin marker, and the translator.
      * @returns the row element.
      */
-    function SessionRow({ row, currentId, onOpen, actions, t }) {
+    function SessionRow({ row, currentId, onOpen, actions, pinned, t }) {
       const now = Date.now();
       return h(
         'div',
@@ -760,6 +782,17 @@ window.__ModuleLoader__.load({
         },
         h('span', { className: 'dshUS-title' }, row.title),
         h('span', { className: 'dshUS-time' }, relativeTime(row.updatedAt, now, t)),
+        pinned === true &&
+          h(
+            'span',
+            {
+              className: 'dshUS-pinMark',
+              role: 'img',
+              'aria-label': t('pinned'),
+              title: t('pinned'),
+            },
+            h(PinGlyph, { size: 14 }),
+          ),
         // The trailing group swallows clicks, so a button press never also
         // opens the row (the host's rows do the same).
         h(
@@ -834,6 +867,8 @@ window.__ModuleLoader__.load({
                   currentId,
                   onOpen,
                   t,
+                  // Every row here is pinned, so every row wears the marker.
+                  pinned: true,
                   actions: [
                     archiveAction(row, onArchive, t),
                     {
@@ -899,6 +934,9 @@ window.__ModuleLoader__.load({
                   currentId,
                   onOpen,
                   t,
+                  // No row here is pinned, so no row wears the marker and the
+                  // time is the row's trailing cell, flush with its edge.
+                  pinned: false,
                   actions: [
                     archiveAction(row, onArchive, t),
                     {
