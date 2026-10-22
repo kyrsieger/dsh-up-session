@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">dsh-up-session</title>
+  <desc id="desc">Three equally tall, right-aligned bars of decreasing width: light blue for pinned sessions, black for recent sessions, and dark gray for workspaces.</desc>
+  <rect x="40" y="44" width="176" height="40" rx="20" fill="#85BEF2"/>
+  <rect x="76" y="108" width="140" height="40" rx="20" fill="#111111"/>
+  <rect x="112" y="172" width="104" height="40" rx="20" fill="#454951"/>
+</svg>
