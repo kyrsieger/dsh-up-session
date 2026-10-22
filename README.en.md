@@ -5,7 +5,8 @@
 A simple DeepSeek Harness sidebar plugin: it inserts two sections, "Pinned" and "Recent", above the "Workspaces" list, gathering pinned sessions from all workspaces into one place and collecting your latest sessions into another.
 
 <p align="center">
-  <img src="./assets/screenshot.png" alt="The sidebar showing the Pinned and Recent sections above the Workspaces list">
+  <img src="./assets/screenshot.png" width="32%" alt="The sidebar showing the Pinned and Recent sections above the Workspaces list">
+  <img src="./assets/settings.png" width="64%" alt="The plugin settings popup with toggles for Show Pinned, Show Recent, and Reveal the session in its workspace">
 </p>
 
 ## Pinned section
