@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./icon.svg" width="128" height="128" alt="dsh-up-session logo">
+</p>
+
 # dsh-up-session
 
 [简体中文](./README.md) | English
@@ -27,7 +31,7 @@ Hovering a row reveals its archive and pin buttons. Pinned sessions appear only 
 
 Each section header carries a gear at its right edge, shown while the pointer is over the header. Clicking it opens this plugin's settings popup, styled like DSH's own settings page.
 
-You can also open the same settings popup from the sidebar via **Plugins → Installed plugins → Pinned Sessions**, then click **Open settings** on the plugin detail page.
+You can also open the same settings popup from the sidebar via **Plugins → Installed plugins → dsh-up-session**, then click **Open settings** on the plugin detail page.
 
 There are three settings:
 
