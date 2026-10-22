@@ -5,7 +5,8 @@
 一个简单的 DeepSeek Harness 侧边栏插件：在「工作区」列表上方插入「置顶」和「最近」两个区，把分散在各个工作区里的置顶会话汇总到一处，也把最近的会话收拢到一处。
 
 <p align="center">
-  <img src="./assets/screenshot.png" alt="侧边栏「工作区」列表上方依次显示置顶区与最近区">
+  <img src="./assets/screenshot.png" width="32%" alt="侧边栏「工作区」列表上方依次显示置顶区与最近区">
+  <img src="./assets/settings.png" width="64%" alt="插件设置弹窗，包含显示置顶、显示最近和展开工作区中的原会话三个开关">
 </p>
 
 ## 置顶区
