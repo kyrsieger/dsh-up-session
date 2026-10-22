@@ -1,14 +1,34 @@
 {
   "name": "dsh-up-session",
-  "version": "0.1.0",
-  "private": true,
+  "version": "1.0.0",
   "type": "module",
   "description": "Adds pinned and recent session sections above the workspace list in the DSH sidebar, with a small settings popup.",
   "license": "MIT",
+  "author": "kyrsieger",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kyrsieger/dsh-up-session.git"
+  },
+  "homepage": "https://github.com/kyrsieger/dsh-up-session#readme",
+  "bugs": {
+    "url": "https://github.com/kyrsieger/dsh-up-session/issues"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh-plugin",
+    "sidebar",
+    "session",
+    "pinned",
+    "recent"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "icon": "./icon.svg",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
+    "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
@@ -17,7 +37,9 @@
     "client.js",
     "cordis.patch.yml",
     "icon.svg",
-    "locale/*.json"
+    "locale/*.json",
+    "assets/*.png",
+    "CHANGELOG.md"
   ],
   "engines": {
     "dsh": "0.2.1-rc.2"

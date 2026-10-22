@@ -13,6 +13,22 @@ A simple DeepSeek Harness sidebar plugin: it inserts two sections, "Pinned" and 
   <img src="./assets/settings.png" width="64%" alt="The plugin settings popup with toggles for Show Pinned, Show Recent, and Reveal the session in its workspace">
 </p>
 
+## Installation and compatibility
+
+Currently supports DSH `0.2.1-rc.2`.
+
+**Web**
+
+```sh
+dsh plugin --profile web add dsh-up-session
+```
+
+Restart DSH after installation. If you use a custom profile, replace `web` with its name.
+
+**Desktop**
+
+Open **Plugins** in the sidebar, click **Add plugin**, enter `dsh-up-session`, and click **Enable now** after installation.
+
 ## Pinned section
 
 Gathers the pinned sessions of every workspace, newest activity first, and collapses like the host's own sections. Hovering a row reveals its archive and unpin buttons.
@@ -38,8 +54,6 @@ There are three settings:
 - **Show Pinned** (on by default): show or hide the entire Pinned section.
 - **Show Recent** (on by default): show or hide the entire Recent section. Both lists can be turned off together and enabled again through **Open settings** on the native plugin detail page.
 - **Reveal the session in its workspace** (on by default): opening a session from Pinned or Recent also expands its workspace group in the sidebar so the original row is visible. Turn it off to open the session without changing which groups are expanded.
-
-Settings are stored in the current browser, apply immediately, and need no save button.
 
 ## Status markers
 
