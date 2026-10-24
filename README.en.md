@@ -15,7 +15,7 @@ A simple DeepSeek Harness sidebar plugin: it inserts two sections, "Pinned" and 
 
 ## Installation and compatibility
 
-The DSH compatibility range is `>=0.2.1-rc.2`, allowing RC.2 and later versions to install; functionality still needs to be verified against the DSH version in use.
+The DSH compatibility range is `>=0.2.1-rc.3`, allowing RC.3 and later versions to install; functionality still needs to be verified against the DSH version in use.
 
 **Web**
 
@@ -64,6 +64,20 @@ Rows in both sections read the same live status as the sidebar's own session row
 - **green dot**: the session just finished and you have not opened it yet.
 
 The marker sits at the left of the title and appears only when there is something to report, so an idle row keeps its original left edge; the archive and pin buttons still appear on hover where they always did.
+
+## Publishing
+
+Publishing a GitHub Release triggers the [publishing workflow](./.github/workflows/publish.yml), which publishes the package at that tag to npm. The tag must match the version in `package.json`, for example `v1.0.1` or `1.0.1`. Stable versions use the npm `latest` tag; prerelease versions use `next` and must also be marked as prereleases on GitHub. Saving a draft or pushing a tag alone does not trigger publishing.
+
+Before the first automated release, add a GitHub Actions trusted publisher in the npm settings for `dsh-up-session` ([official npm instructions](https://docs.npmjs.com/trusted-publishers/)):
+
+- Organization or user: `kyrsieger`
+- Repository: `dsh-up-session`
+- Workflow filename: `publish.yml`
+- Environment name: leave blank
+- Allowed actions: allow direct publishing with `npm publish`
+
+The workflow authenticates through OIDC, so no `NPM_TOKEN` is needed. Commit and push the workflow, version number, and changelog first, then create a tag for that commit and publish its Release. If publishing fails, rerun the failed job in GitHub Actions; npm versions that have already been published successfully cannot be published again.
 
 ## License
 
