@@ -15,7 +15,7 @@ A simple DeepSeek Harness sidebar plugin: it inserts two sections, "Pinned" and 
 
 ## Installation and compatibility
 
-Currently supports DSH `0.2.1-rc.2`.
+Currently supports DSH `0.2.1-rc.3`.
 
 **Web**
 
