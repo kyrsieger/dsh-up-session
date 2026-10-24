@@ -15,7 +15,7 @@
 
 ## 安装与兼容
 
-DSH 兼容版本声明为 `>=0.2.1-rc.2`，允许 RC.2 及后续版本安装；具体功能仍需与所用 DSH 版本验证。
+DSH 兼容版本声明为 `>=0.2.1-rc.3`，允许 RC.3 及后续版本安装；具体功能仍需与所用 DSH 版本验证。
 
 **Web 端**
 
@@ -64,6 +64,20 @@ dsh plugin --profile web add dsh-up-session
 - **绿点**：会话刚完成，而你还没打开看过。
 
 状态标记插在标题左侧，只在需要提示时才出现，空闲的行保持原本的左边缘；归档、置顶等操作按钮在悬停时出现的位置不受影响。
+
+## 发布
+
+发布 GitHub Release 后，[发布工作流](./.github/workflows/publish.yml) 会自动将该 tag 对应的包发布到 npm。tag 必须与 `package.json` 的版本一致，例如 `v1.0.1` 或 `1.0.1`。正式版使用 npm 的 `latest` 标签；预发布版使用 `next`，且 GitHub Release 必须标记为预发布。仅保存草稿或推送 tag 不会触发发布。
+
+首次使用前，在 npm 的 `dsh-up-session` 包设置中添加 GitHub Actions 可信发布者（[npm 官方说明](https://docs.npmjs.com/trusted-publishers/)）：
+
+- Organization or user：`kyrsieger`
+- Repository：`dsh-up-session`
+- Workflow filename：`publish.yml`
+- Environment name：留空
+- Allowed actions：允许直接执行 `npm publish`
+
+工作流使用 OIDC 认证，无需配置 `NPM_TOKEN`。先将工作流、版本号和更新日志提交并推送，再为该提交创建 tag 和发布 Release。发布失败时，可在 GitHub Actions 中重跑失败的任务；已成功发布的 npm 版本不能重复发布。
 
 ## 许可
 

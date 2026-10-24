@@ -1,0 +1,66 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Validate release version
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
+          const tag = process.env.RELEASE_TAG;
+          if (tag !== version && tag !== `v${version}`) {
+            throw new Error(`Release tag ${tag} does not match package version ${version}`);
+          }
+          const prerelease = version.includes('-');
+          if (prerelease !== (process.env.RELEASE_PRERELEASE === 'true')) {
+            throw new Error('Release prerelease status must match the package version');
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `npm_tag=${prerelease ? 'next' : 'latest'}\n`);
+          NODE
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check index.js
+          node --check client.js
+
+      - name: Preview package contents
+        run: npm pack --dry-run
+
+      - name: Publish package
+        env:
+          NPM_DIST_TAG: ${{ steps.version.outputs.npm_tag }}
+        run: npm publish --access public --tag "$NPM_DIST_TAG"
