@@ -1,6 +1,6 @@
 {
   "name": "dsh-up-session",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "description": "Adds pinned and recent session sections above the workspace list in the DSH sidebar, with a small settings popup.",
   "license": "MIT",
@@ -42,7 +42,7 @@
     "CHANGELOG.md"
   ],
   "engines": {
-    "dsh": ">=0.2.1-rc.3"
+    "dsh": ">=0.2.1-rc.2"
   },
   "dsh": {
     "bundle": {
