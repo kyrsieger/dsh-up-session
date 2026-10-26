@@ -150,7 +150,7 @@ window.__ModuleLoader__.load({
       // twice, so the section copies the real geometry instead of predicting it.
       '.dshUS-mount{box-sizing:border-box;flex:none;display:flex;flex-direction:column;gap:4px;',
       'padding-left:4px;margin:0 0 4px -4px}',
-      '.dshUS-mount[data-rail="true"]{display:none}',
+      '.dshUS-mount[data-rail="true"],.dshUS-mount[data-searching="true"]{display:none}',
       '.dshUS-root{box-sizing:border-box;display:flex;flex-direction:column;gap:2px}',
       // The header copies the host's "Workspaces" section header: same box, same
       // 14px/20px label, same tertiary label colour. The whole row is the toggle,
@@ -1009,8 +1009,8 @@ window.__ModuleLoader__.load({
     /**
      * The root of the plugin's sidebar surface: the pinned section, the recent
      * section, and the one archive confirmation both sections can raise. It is
-     * rendered through a portal into the host node the plugin keeps just above
-     * the workspace slot's anchor.
+     * rendered through a portal into the host node the plugin keeps at the top
+     * of the workspace list, inside the "Workspaces" section.
      * @param props - composed slot props plus the injected host and actions.
      * @returns the portal, or null when there is nowhere to portal into.
      */
@@ -1838,11 +1838,32 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Keep the host node immediately before the workspace slot's anchor. The
-     * workspaces seat lives in the sidebar's column flex container, so a sibling
-     * inserted there takes its own space and pushes the browser down instead of
-     * covering it. Both sections share that node and stack inside it. Hiding in
-     * the collapsed rail mirrors the shell's own rule.
+     * The scroll box holding the workspace list. In the grouped and flat views
+     * the `role="tree"` box scrolls itself; while searching, the results tree
+     * sits one level inside that same box, so the nearest scrolling ancestor is
+     * the seat either way. The sections live at the top of this box, inside the
+     * "Workspaces" section, and scroll away with the workspace rows instead of
+     * taking a fixed slice of the sidebar above them.
+     * @param anchor - the Workspaces slot anchor.
+     * @returns the scroll box, or null while the sidebar renders no list.
+     */
+    function workspaceScrollBox(anchor) {
+      const tree = anchor.querySelector('[role="tree"]');
+      if (!(tree instanceof Element)) return null;
+      for (let node = tree; node !== null && node !== anchor; node = node.parentElement) {
+        const { overflowY } = getComputedStyle(node);
+        if (overflowY === 'auto' || overflowY === 'scroll') return node;
+      }
+      return null;
+    }
+
+    /**
+     * Keep the host node at the top of the workspace list. Both sections share
+     * that node and stack inside it, so they read as the first two groups of
+     * the "Workspaces" section rather than as sections of their own. Hiding in
+     * the collapsed rail mirrors the shell's own rule, and the list cannot hold
+     * the sections while the user is searching its rows, so they step aside for
+     * the results.
      * @param host - the container the portal renders into.
      * @returns the disposer that detaches the node and its observers.
      */
@@ -1852,12 +1873,25 @@ window.__ModuleLoader__.load({
 
       const place = () => {
         const anchor = document.querySelector('[data-slot="sidebar.workspaces"]');
-        if (!(anchor instanceof Element)) return;
+        if (!(anchor instanceof Element)) {
+          host.remove();
+          return;
+        }
         const parent = anchor.parentElement;
         if (parent === null) return;
-        if (host.parentElement !== parent || host.nextElementSibling !== anchor) {
-          parent.insertBefore(host, anchor);
+        const seat = workspaceScrollBox(anchor);
+        if (seat === null) {
+          host.remove();
+          return;
         }
+        if (host.parentElement !== seat || seat.firstElementChild !== host) {
+          seat.insertBefore(host, seat.firstChild);
+        }
+        // Search results replace the list's rows; the sections would otherwise
+        // sit above those results as unrelated pinned and recent rows.
+        const search = anchor.querySelector('input[type="text"]');
+        host.dataset.searching =
+          search instanceof HTMLInputElement && search.value.trim() !== '' ? 'true' : 'false';
         if (resize === undefined) {
           // The seat spans the sidebar's inner width, which is narrower than the
           // column by its inline padding; the rail seat is far narrower still.
@@ -1891,7 +1925,7 @@ window.__ModuleLoader__.load({
       };
     }
 
-    /** Contribute the pinned and recent sections above the workspace list. */
+    /** Contribute the pinned and recent sections inside the workspace list. */
     function apply(ctx) {
       ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'up-session: dictionaries');
       const t = ctx.locale.bind(NS);
