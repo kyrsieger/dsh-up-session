@@ -6,10 +6,10 @@
 
 [简体中文](./README.md) | English
 
-A simple DeepSeek Harness sidebar plugin: it inserts two sections, "Pinned" and "Recent", above the "Workspaces" list, gathering pinned sessions from all workspaces into one place and collecting your latest sessions into another.
+A simple DeepSeek Harness sidebar plugin: it inserts two groups, "Pinned" and "Recent", at the top of the "Workspaces" list, gathering pinned sessions from all workspaces into one place and collecting your latest sessions into another.
 
 <p align="center">
-  <img src="./assets/screenshot.png" width="32%" alt="The sidebar showing the Pinned and Recent sections above the Workspaces list">
+  <img src="./assets/screenshot.png" width="32%" alt="The sidebar showing the Pinned and Recent groups at the top of the Workspaces list">
   <img src="./assets/settings.png" width="64%" alt="The plugin settings popup with toggles for Show Pinned, Show Recent, and Reveal the session in its workspace">
 </p>
 
@@ -33,9 +33,11 @@ Open **Plugins** in the sidebar, click **Add plugin**, enter `dsh-up-session`, a
 
 Gathers the pinned sessions of every workspace, newest activity first, and collapses like the host's own sections. Hovering a row reveals its archive and unpin buttons.
 
+Both Pinned and Recent sit at the top of the workspaces list as its first two groups and scroll together with the workspace groups below. While the workspace search is open, they step aside so the list can show the results.
+
 ## Recent section
 
-Sits between the pinned section and the workspaces, lists the sessions that are not pinned, newest activity first, and shows the latest five by default. It looks and collapses exactly like the pinned section. Once there are more than five sessions, a "Show more" button appears at the bottom of the list:
+Sits between the pinned section and the workspace rows, lists the sessions that are not pinned, newest activity first, and shows the latest five by default. It looks and collapses exactly like the pinned section. Once there are more than five sessions, a "Show more" button appears at the bottom of the list:
 
 - each click reveals five more sessions,
 - once every session is on screen the button reads "Show less",
