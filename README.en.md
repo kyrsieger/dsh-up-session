@@ -15,7 +15,7 @@ A simple DeepSeek Harness sidebar plugin: it inserts two groups, "Pinned" and "R
 
 ## Installation and compatibility
 
-The DSH compatibility range is `>=0.2.1-rc.2`, allowing RC.2 and later versions to install; functionality still needs to be verified against the DSH version in use.
+The DSH compatibility range is `>=0.2.1-rc.2`, allowing 0.2.1-rc.2, later prereleases of that version, and higher stable versions to install; functionality still needs to be verified against the DSH version in use.
 
 **Web**
 
