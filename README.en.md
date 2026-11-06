@@ -33,6 +33,8 @@ Open **Plugins** in the sidebar, click **Add plugin**, enter `dsh-up-session`, a
 
 Gathers the pinned sessions of every workspace, newest activity first, and collapses like the host's own sections. Hovering a row reveals its archive and unpin buttons.
 
+Right-clicking a pinned or recent row, or focusing it and pressing the menu key or Shift+F10, opens the same session menu as a row in the workspace list: pin or unpin, rename, fork, copy the Session ID, reveal in the file manager, and archive. The items are the host's own contributions, so they stay in step with the same session further down the list. Rename is prefilled with the session's own title; an untitled session is not prefilled with the "Untitled" label.
+
 Both Pinned and Recent sit at the top of the workspaces list as its first two groups and scroll together with the workspace groups below. While the workspace search is open, they step aside so the list can show the results.
 
 ## Recent section
@@ -43,7 +45,7 @@ Sits between the pinned section and the workspace rows, lists the sessions that 
 - once every session is on screen the button reads "Show less",
 - clicking "Show less" folds the list back to the latest five.
 
-Hovering a row reveals its archive and pin buttons. Pinned sessions appear only in the pinned section, so no conversation is listed twice.
+Hovering a row reveals its archive and pin buttons. The context menu is the same as in the pinned section. Pinned sessions appear only in the pinned section, so no conversation is listed twice.
 
 ## Settings
 
