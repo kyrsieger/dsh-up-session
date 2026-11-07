@@ -15,7 +15,9 @@ A simple DeepSeek Harness sidebar plugin: it inserts two groups, "Pinned" and "R
 
 ## Installation and compatibility
 
-The DSH compatibility range is `>=0.2.1-rc.2`, allowing 0.2.1-rc.2, later prereleases of that version, and higher stable versions to install; functionality still needs to be verified against the DSH version in use.
+**Upgrade to DSH 0.2.2-alpha.3 or later. This plugin uses the session menu API introduced in that version.**
+
+Plugin version 1.0.4 requires DSH `>=0.2.2-alpha.3`. Installing it on an earlier DSH version may prevent DSH from starting.
 
 **Web**
 
@@ -28,6 +30,22 @@ Restart DSH after installation. If you use a custom profile, replace `web` with 
 **Desktop**
 
 Open **Plugins** in the sidebar, click **Add plugin**, enter `dsh-up-session`, and click **Enable now** after installation.
+
+### Installing 1.0.3 on older DSH versions
+
+If your DSH version is older than 0.2.2-alpha.3 and falls within plugin version 1.0.3's compatibility range (`>=0.2.1-rc.2`), install `dsh-up-session@1.0.3`.
+
+**Web**
+
+```sh
+dsh plugin --profile web add dsh-up-session@1.0.3
+```
+
+Restart DSH after installation. If you use a custom profile, replace `web` with its name.
+
+**Desktop**
+
+Open **Plugins** in the sidebar, click **Add plugin**, enter `dsh-up-session@1.0.3`, and click **Enable now** after installation.
 
 ## Pinned section
 
