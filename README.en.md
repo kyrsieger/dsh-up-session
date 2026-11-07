@@ -57,11 +57,11 @@ Both Pinned and Recent sit at the top of the workspaces list as its first two gr
 
 ## Recent section
 
-Sits between the pinned section and the workspace rows, lists the sessions that are not pinned, newest activity first, and shows the latest five by default. It looks and collapses exactly like the pinned section. Once there are more than five sessions, a "Show more" button appears at the bottom of the list:
+Sits between the pinned section and the workspace rows, lists the sessions that are not pinned, newest activity first, and shows the latest five by default. The rest count is configurable in Settings (1–50); "Show more" always adds five. It looks and collapses exactly like the pinned section. Once there are more sessions than the current count, a "Show more" button appears at the bottom of the list:
 
 - each click reveals five more sessions,
 - once every session is on screen the button reads "Show less",
-- clicking "Show less" folds the list back to the latest five.
+- clicking "Show less" folds the list back to the configured count.
 
 Hovering a row reveals its archive and pin buttons. The context menu is the same as in the pinned section. Pinned sessions appear only in the pinned section, so no conversation is listed twice.
 
@@ -71,11 +71,12 @@ Each section header carries a gear at its right edge, shown while the pointer is
 
 You can also open the same settings popup from the sidebar via **Plugins → Installed plugins → dsh-up-session**, then click **Open settings** on the plugin detail page.
 
-There are three settings:
+There are four settings:
 
 - **Show Pinned** (on by default): show or hide the entire Pinned section.
 - **Show Recent** (on by default): show or hide the entire Recent section. Both lists can be turned off together and enabled again through **Open settings** on the native plugin detail page.
 - **Reveal the session in its workspace** (on by default): opening a session from Pinned or Recent also expands its workspace group in the sidebar so the original row is visible. Turn it off to open the session without changing which groups are expanded.
+- **Sessions shown in Recent** (five by default): how many recent sessions Recent shows at rest. Accepts 1–50; a value outside that range snaps to the nearest bound. Typing applies on Enter or when the field loses focus, and the arrow buttons beside the field step by one. "Show more" always adds five, regardless of this count.
 
 ## Status markers
 

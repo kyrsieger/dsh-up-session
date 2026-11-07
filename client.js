@@ -25,12 +25,17 @@ window.__ModuleLoader__.load({
       settings: '设置',
       settingsTitle: '设置',
       settingsOpen: '打开设置',
-      settingsEntryDesc: '管理列表显示和打开会话时的工作区展开行为。',
+      settingsEntryDesc: '管理列表显示、最近区展示数量和打开会话时的工作区展开行为。',
       settingsClose: '关闭设置',
       settingsShowPinned: '显示置顶',
       settingsShowPinnedDesc: '在侧边栏显示置顶会话列表。',
       settingsShowRecent: '显示最近',
       settingsShowRecentDesc: '在侧边栏显示最近会话列表。',
+      settingsRecentPageSize: '最近区默认展示的会话数',
+      settingsRecentPageSizeDesc:
+        '「最近」默认显示最新的多少条会话；「展开更多」每次增加 5 条，「收起」回到这个数量。可填 1–50，默认 5。',
+      settingsPageSizeIncrease: '增加 1',
+      settingsPageSizeDecrease: '减少 1',
       settingsExpandWorkspace: '展开工作区中的原会话',
       settingsExpandWorkspaceDesc:
         '从置顶或最近区打开会话时，同时展开它在工作区列表中的位置。关闭后只打开会话，不改变工作区的展开状态。',
@@ -91,12 +96,18 @@ window.__ModuleLoader__.load({
       settings: 'Settings',
       settingsTitle: 'Settings',
       settingsOpen: 'Open settings',
-      settingsEntryDesc: 'Manage list visibility and workspace expansion when opening sessions.',
+      settingsEntryDesc:
+        'Manage list visibility, how many sessions Recent shows, and workspace expansion when opening sessions.',
       settingsClose: 'Close settings',
       settingsShowPinned: 'Show Pinned',
       settingsShowPinnedDesc: 'Show the pinned session list in the sidebar.',
       settingsShowRecent: 'Show Recent',
       settingsShowRecentDesc: 'Show the recent session list in the sidebar.',
+      settingsRecentPageSize: 'Sessions shown in Recent',
+      settingsRecentPageSizeDesc:
+        'How many recent sessions to show by default. “Show more” adds five each time and “Show less” folds the list back to it; accepts 1–50, five by default.',
+      settingsPageSizeIncrease: 'Increase by 1',
+      settingsPageSizeDecrease: 'Decrease by 1',
       settingsExpandWorkspace: 'Reveal the session in its workspace',
       settingsExpandWorkspaceDesc:
         'When you open a session from Pinned or Recent, also expand its workspace in the sidebar. Turn this off to open the session without changing which workspaces are expanded.',
@@ -313,7 +324,7 @@ window.__ModuleLoader__.load({
       // The plugin's settings popup, rebuilt on the host's own settings panel:
       // the 800px panel narrowed for a single page, the mask and elevation, the
       // 54px header with a 28px close, and the content's 24px inset. The page
-      // itself holds one preference row with the host's 36x20 switch.
+      // itself holds the host's 36x20 switches beside one themed number field.
       '.dshUS-settingsRoot{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;',
       'justify-content:center;padding:24px}',
       '.dshUS-settingsMask{position:absolute;inset:var(--dsh-frame-chrome-top,0px) 0 0;',
@@ -354,6 +365,31 @@ window.__ModuleLoader__.load({
       'background:var(--dsw-alias-switch-thumb)}',
       '.dshUS-switch[aria-checked="true"] .dshUS-switchThumb{transform:translate(16px)}',
       '@media (prefers-reduced-motion:reduce){.dshUS-switchThumb{transition:none}}',
+      // The Recent count field, styled as the host's own compact input: the
+      // same hairline border, radius, and focus ring as the buttons, with the
+      // native spinner hidden so the number reads as one value. The chevrons
+      // beside it are the visible way to step; they are plain ghost buttons so
+      // the pair stays quiet next to the switches.
+      '.dshUS-numberField{display:flex;align-items:center;gap:6px;flex:none}',
+      '.dshUS-number{box-sizing:border-box;flex:none;width:72px;height:32px;padding:0 10px;',
+      'border:.5px solid var(--dsw-alias-border-l3);border-radius:var(--dsw-radius-md,8px);',
+      'background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:14px;',
+      'line-height:22px;text-align:center;-moz-appearance:textfield;appearance:textfield}',
+      '.dshUS-number:hover{background:var(--dsw-alias-interactive-bg-hover)}',
+      '.dshUS-number:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
+      'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:1px}',
+      '.dshUS-number::-webkit-outer-spin-button,',
+      '.dshUS-number::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}',
+      '.dshUS-stepper{display:flex;flex-direction:column;gap:1px}',
+      '.dshUS-step{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;',
+      'width:22px;height:15px;padding:0;border:0;border-radius:var(--dsw-radius-sm,4px);',
+      'background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer}',
+      '.dshUS-step:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);',
+      'color:var(--dsw-alias-label-primary)}',
+      '.dshUS-step:disabled{cursor:not-allowed;opacity:.35}',
+      '.dshUS-step:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
+      'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:0}',
+      '.dshUS-stepGlyphUp{transform:rotate(180deg)}',
       // "Stop and archive" confirmation: the host's Modal geometry (380px panel,
       // layer-2 surface, 24px body inset) narrowed to the host's confirmation
       // width, all painted with theme tokens.
@@ -847,26 +883,59 @@ window.__ModuleLoader__.load({
       return t('time.years', { n: Math.floor(months / 12) });
     }
 
-    /** How many recent rows one click reveals, and how many show at rest. */
-    const RECENT_PAGE = 5;
+    /**
+     * The recent list's rest-size bounds, and the fixed step one "Show more"
+     * click reveals. The rest size is configurable; the step stays at five, so
+     * raising the rest size never widens how far one click jumps.
+     */
+    const RECENT_PAGE_DEFAULT = 5;
+    const RECENT_PAGE_MIN = 1;
+    const RECENT_PAGE_MAX = 50;
+    const RECENT_PAGE_STEP = 5;
     /** localStorage key holding this plugin's browser-local preferences. */
     const PREFERENCES_KEY = 'dsh-up-session/preferences.v1';
 
     /**
+     * A page size that can actually drive the list: a whole number inside the
+     * supported range, rounded, and every other number pulled back to that
+     * range. Hand-edited or migrated records can therefore never ask for zero
+     * rows or for an unbounded list.
+     * @param value - any number.
+     * @returns the usable page size.
+     */
+    function clampRecentPageSize(value) {
+      if (!Number.isFinite(value)) return RECENT_PAGE_DEFAULT;
+      return Math.min(RECENT_PAGE_MAX, Math.max(RECENT_PAGE_MIN, Math.round(value)));
+    }
+
+    /**
      * The plugin's preferences, read from browser storage. A missing, malformed,
      * or unreadable record falls back to the defaults; in particular the
-     * workspace-reveal behavior is on, which is what every earlier version did.
+     * workspace-reveal behavior is on, which is what every earlier version did,
+     * and the Recent page size is five, which is what every earlier version
+     * showed. Each field is validated on its own, so one damaged value costs
+     * only that preference.
      * @returns the current preference values.
      */
     function readPreferences() {
-      const fallback = { expandWorkspaceOnOpen: true, showPinned: true, showRecent: true };
+      const fallback = {
+        expandWorkspaceOnOpen: true,
+        showPinned: true,
+        showRecent: true,
+        recentPageSize: RECENT_PAGE_DEFAULT,
+      };
       try {
         const raw = localStorage.getItem(PREFERENCES_KEY);
         if (raw === null) return fallback;
         const parsed = JSON.parse(raw);
         const preferences = { ...fallback };
         for (const key of Object.keys(fallback)) {
-          if (typeof parsed?.[key] === 'boolean') preferences[key] = parsed[key];
+          const value = parsed?.[key];
+          if (key === 'recentPageSize') {
+            if (typeof value === 'number') preferences[key] = clampRecentPageSize(value);
+          } else if (typeof value === 'boolean') {
+            preferences[key] = value;
+          }
         }
         return preferences;
       } catch (_reason) {
@@ -888,20 +957,22 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The recent list's window for one page limit. A limit below one page still
-     * shows one page, so the list never shrinks under its rest size.
+     * The recent list's window for one page limit. A limit below the rest size
+     * still shows the rest size, so the list never shrinks under it; "Show
+     * more" always adds the same five rows.
      * @param rowCount - how many recent Sessions there are.
      * @param limit - how many the list is currently allowed to show.
+     * @param pageSize - how many rows show at rest.
      * @returns the visible row count, whether every Session is on screen, and
      *   the limit one click installs next.
      */
-    function recentWindow(rowCount, limit) {
-      const shown = Math.max(RECENT_PAGE, limit);
+    function recentWindow(rowCount, limit, pageSize) {
+      const shown = Math.max(pageSize, limit);
       const allShown = shown >= rowCount;
       return {
         visible: Math.min(shown, rowCount),
         allShown,
-        next: allShown ? RECENT_PAGE : shown + RECENT_PAGE,
+        next: allShown ? pageSize : shown + RECENT_PAGE_STEP,
       };
     }
 
@@ -1070,7 +1141,7 @@ window.__ModuleLoader__.load({
         return () => settingsEvents.removeEventListener('open', openSettings);
       }, [settingsEvents]);
       const [preferences, setPreferences] = React.useState(readPreferences);
-      const { expandWorkspaceOnOpen, showPinned, showRecent } = preferences;
+      const { expandWorkspaceOnOpen, recentPageSize, showPinned, showRecent } = preferences;
       React.useEffect(() => writePreferences(preferences), [preferences]);
       const changePreference = (key, value) => {
         setPreferences((previous) => {
@@ -1185,6 +1256,7 @@ window.__ModuleLoader__.load({
         showRecent && h(RecentSection, {
           ...shared,
           rows: recent,
+          pageSize: recentPageSize,
           onPin: (row) => pin(row.id),
         }),
         settingsDialog,
@@ -1439,13 +1511,15 @@ window.__ModuleLoader__.load({
 
     /**
      * The recent section: ordinary Sessions that are not pinned, newest
-     * activity first, revealed five at a time. The header collapses the whole
-     * section; the footer button pages the list, and once every Session is on
-     * screen it collapses the list back to its first five.
+     * activity first, revealed from a configurable rest size. The header
+     * collapses the whole section; the footer button reveals five more, and
+     * once every Session is on screen it folds the list back to its rest size.
+     * @param props - the rows, the configured page size, row callbacks, and the translator.
      * @returns the section element.
      */
     function RecentSection({
       rows,
+      pageSize,
       currentId,
       onOpen,
       onArchive,
@@ -1458,14 +1532,16 @@ window.__ModuleLoader__.load({
     }) {
       const [expanded, setExpanded] = React.useState(true);
       // How many rows the list is allowed to show; the button below the list
-      // moves it by one page, and no change to the Session set resets it, so a
-      // new message elsewhere never folds a list the user opened.
-      const [limit, setLimit] = React.useState(RECENT_PAGE);
+      // moves it by five, and no change to the Session set resets it, so a new
+      // message elsewhere never folds a list the user opened. A new rest size
+      // is a deliberate choice, so it does reset it.
+      const [limit, setLimit] = React.useState(pageSize);
+      React.useEffect(() => setLimit(pageSize), [pageSize]);
       const toggleExpanded = () => setExpanded((value) => !value);
-      const page = recentWindow(rows.length, limit);
+      const page = recentWindow(rows.length, limit, pageSize);
       const visible = rows.slice(0, page.visible);
       const pager =
-        rows.length > RECENT_PAGE
+        rows.length > pageSize
           ? h(
               'button',
               {
@@ -1569,12 +1645,132 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * One stepper chevron: a small V pointing up or down beside the count field,
+     * drawn at the size of the host's compact controls.
+     * @param props - the direction the chevron points.
+     * @returns the chevron SVG.
+     */
+    function StepGlyph({ direction }) {
+      return h(
+        'svg',
+        {
+          width: 12,
+          height: 12,
+          viewBox: '0 0 16 16',
+          fill: 'none',
+          xmlns: 'http://www.w3.org/2000/svg',
+          'aria-hidden': 'true',
+          strokeWidth: 2,
+          className: direction === 'up' ? 'dshUS-stepGlyphUp' : undefined,
+        },
+        h('path', {
+          d: 'M4 6L7.29289 9.29289C7.68342 9.68342 8.31658 9.68342 8.70711 9.29289L12 6',
+          stroke: 'currentColor',
+        }),
+      );
+    }
+
+    /**
+     * The Recent page-size field: the number, plus one chevron per direction.
+     * Typing only moves the draft, so nothing is applied mid-edit; the value is
+     * confirmed when the field is left, Enter is pressed, or a chevron is
+     * clicked. Confirming writes the clamped number and drops a draft that is
+     * not a number at all. The draft follows the stored value when the
+     * preference changes elsewhere.
+     * @param props - the stored size, its writer, the field and button labels, and the id of its description.
+     * @returns the field and its stepper.
+     */
+    function RecentPageSizeInput({
+      value,
+      onChange,
+      label,
+      descriptionId,
+      increaseLabel,
+      decreaseLabel,
+    }) {
+      const [draft, setDraft] = React.useState(String(value));
+      React.useEffect(() => {
+        setDraft(String(value));
+      }, [value]);
+      // What the field itself considers its number: a usable draft, clamped, or
+      // the stored value while the draft says nothing readable.
+      const parsed = draft.trim() === '' ? Number.NaN : Number(draft);
+      const current = Number.isFinite(parsed) ? clampRecentPageSize(parsed) : value;
+      const settle = () => {
+        setDraft(String(current));
+        if (current !== value) onChange(current);
+      };
+      // A click on a chevron is a confirmation of its own, so it applies its
+      // step immediately instead of waiting for the field to be left.
+      const step = (delta) => {
+        const next = clampRecentPageSize(current + delta);
+        setDraft(String(next));
+        if (next !== value) onChange(next);
+      };
+      return h(
+        'div',
+        { className: 'dshUS-numberField' },
+        h('input', {
+          className: 'dshUS-number',
+          type: 'number',
+          inputMode: 'numeric',
+          min: RECENT_PAGE_MIN,
+          max: RECENT_PAGE_MAX,
+          step: 1,
+          value: draft,
+          'aria-label': label,
+          'aria-describedby': descriptionId,
+          // Typing only edits the draft; Enter, blur, or a chevron confirms it.
+          onChange: (event) => setDraft(event.target.value),
+          onBlur: settle,
+          onKeyDown: (event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            settle();
+            event.currentTarget.blur();
+          },
+        }),
+        h(
+          'span',
+          { className: 'dshUS-stepper' },
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'dshUS-step',
+              'aria-label': increaseLabel,
+              title: increaseLabel,
+              disabled: current >= RECENT_PAGE_MAX,
+              onClick: () => step(1),
+            },
+            h(StepGlyph, { direction: 'up' }),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'dshUS-step',
+              'aria-label': decreaseLabel,
+              title: decreaseLabel,
+              disabled: current <= RECENT_PAGE_MIN,
+              onClick: () => step(-1),
+            },
+            h(StepGlyph, { direction: 'down' }),
+          ),
+        ),
+      );
+    }
+
+    /**
      * The plugin's settings popup, built to read like the host's settings panel:
      * a centered layer-2 panel with a 54px header and preference rows whose
-     * switch is the host's own 36x20 control. It portals to the body because the
-     * sidebar column clips its contents, and it owns no saved state: the switch
-     * writes through immediately, so closing the popup never discards a choice.
-     * @param props - the preference value, its writer, settlement, and the translator.
+     * switch is the host's own 36x20 control and whose count field is a themed
+     * number input with one chevron per direction. It portals to the body
+     * because the sidebar column clips its contents, and it owns no saved state:
+     * each control applies its value when the user confirms it — a switch on
+     * click, the count on Enter, blur, or a chevron — so closing the popup keeps
+     * every confirmed choice.
+     * @param props - the preference values, their writer, settlement, and the translator.
      * @returns the modal layer.
      */
     function SettingsDialog({ preferences, onChangePreference, onClose, t }) {
@@ -1586,6 +1782,8 @@ window.__ModuleLoader__.load({
         { key: 'showRecent', label: 'settingsShowRecent', description: 'settingsShowRecentDesc' },
         { key: 'expandWorkspaceOnOpen', label: 'settingsExpandWorkspace',
           description: 'settingsExpandWorkspaceDesc' },
+        { key: 'recentPageSize', control: 'number', label: 'settingsRecentPageSize',
+          description: 'settingsRecentPageSizeDesc' },
       ];
       // Focus moves into the panel on open (the host's Modal does the same), and
       // the effect puts it back on the section's settings entry on close. That
@@ -1653,33 +1851,42 @@ window.__ModuleLoader__.load({
             h(
               'div',
               { className: 'dshUS-settingsBody' },
-              ...settings.map((setting) => h(
-                'div',
-                { className: 'dshUS-settingsRow', key: setting.key },
-                h(
+              ...settings.map((setting) => {
+                const copyId = descriptionId + setting.key;
+                return h(
                   'div',
-                  { className: 'dshUS-settingsCopy' },
-                  h('div', { className: 'dshUS-settingsRowTitle' }, t(setting.label)),
+                  { className: 'dshUS-settingsRow', key: setting.key },
                   h(
                     'div',
-                    { className: 'dshUS-settingsRowDesc', id: descriptionId + setting.key },
-                    t(setting.description),
+                    { className: 'dshUS-settingsCopy' },
+                    h('div', { className: 'dshUS-settingsRowTitle' }, t(setting.label)),
+                    h('div', { className: 'dshUS-settingsRowDesc', id: copyId },
+                      t(setting.description)),
                   ),
-                ),
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    role: 'switch',
-                    className: 'dshUS-switch',
-                    'aria-checked': preferences[setting.key],
-                    'aria-label': t(setting.label),
-                    'aria-describedby': descriptionId + setting.key,
-                    onClick: () => onChangePreference(setting.key, !preferences[setting.key]),
-                  },
-                  h('span', { className: 'dshUS-switchThumb' }),
-                ),
-              )),
+                  setting.control === 'number'
+                    ? h(RecentPageSizeInput, {
+                        value: preferences[setting.key],
+                        onChange: (value) => onChangePreference(setting.key, value),
+                        label: t(setting.label),
+                        descriptionId: copyId,
+                        increaseLabel: t('settingsPageSizeIncrease'),
+                        decreaseLabel: t('settingsPageSizeDecrease'),
+                      })
+                    : h(
+                        'button',
+                        {
+                          type: 'button',
+                          role: 'switch',
+                          className: 'dshUS-switch',
+                          'aria-checked': preferences[setting.key],
+                          'aria-label': t(setting.label),
+                          'aria-describedby': copyId,
+                          onClick: () => onChangePreference(setting.key, !preferences[setting.key]),
+                        },
+                        h('span', { className: 'dshUS-switchThumb' }),
+                      ),
+                );
+              }),
             ),
           ),
         ),
