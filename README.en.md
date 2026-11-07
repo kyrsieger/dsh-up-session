@@ -78,30 +78,6 @@ There are four settings:
 - **Reveal the session in its workspace** (on by default): opening a session from Pinned or Recent also expands its workspace group in the sidebar so the original row is visible. Turn it off to open the session without changing which groups are expanded.
 - **Sessions shown in Recent** (five by default): how many recent sessions Recent shows at rest. Accepts 1–50; a value outside that range snaps to the nearest bound. Typing applies on Enter or when the field loses focus, and the arrow buttons beside the field step by one. "Show more" always adds five, regardless of this count.
 
-## Status markers
-
-Rows in both sections read the same live status as the sidebar's own session rows, so all three places always agree. When several states apply, the first one below wins:
-
-- **amber dot**: the session is waiting for you — an answer, an approval, or a plan review;
-- **spinner**: the session is running, either its own turn or a subagent it still has working;
-- **green dot**: the session just finished and you have not opened it yet.
-
-The marker appears only when there is something to report. Idle rows reserve the same space to the left of the title, matching the workspace list's session indent and keeping titles from shifting when the status changes.
-
-## Publishing
-
-Publishing a GitHub Release triggers the [publishing workflow](./.github/workflows/publish.yml), which publishes the package at that tag to npm. The tag must match the version in `package.json`, for example `v1.0.1` or `1.0.1`. Stable versions use the npm `latest` tag; prerelease versions use `next` and must also be marked as prereleases on GitHub. Saving a draft or pushing a tag alone does not trigger publishing.
-
-Before the first automated release, add a GitHub Actions trusted publisher in the npm settings for `dsh-up-session` ([official npm instructions](https://docs.npmjs.com/trusted-publishers/)):
-
-- Organization or user: `kyrsieger`
-- Repository: `dsh-up-session`
-- Workflow filename: `publish.yml`
-- Environment name: leave blank
-- Allowed actions: allow direct publishing with `npm publish`
-
-The workflow authenticates through OIDC, so no `NPM_TOKEN` is needed. Commit and push the workflow, version number, and changelog first, then create a tag for that commit and publish its Release. If publishing fails, rerun the failed job in GitHub Actions; npm versions that have already been published successfully cannot be published again.
-
 ## License
 
 This project is licensed under the [MIT License](./LICENSE).

@@ -78,30 +78,6 @@ dsh plugin --profile web add dsh-up-session@1.0.3
 - **展开工作区中的原会话**（默认开启）：从置顶区或最近区点击会话时，同时展开它在工作区列表中所在的分组，让原生会话行可见。关闭后只打开会话，不改变工作区的展开状态。
 - **最近区默认展示的会话数**（默认 5）：最近区默认显示最新的多少条会话。可填 1–50，超出范围会被拉回到最近的边界值。输入后按回车或离开输入框才生效，输入框右侧的上下按键每点一次增减 1。「展开更多」每次固定增加 5 条，不受这个数量影响。
 
-## 状态标记
-
-两个区的会话行与工作区里的会话行共用同一份运行状态，所以三处的标记始终一致。同时满足多项时按下面的顺序取第一项：
-
-- **橙点**：会话正在等你回应，可能是等待回答、等待审批或计划待审；
-- **转圈**：会话正在进行，包括它自己的回合，以及它还有正在运行的子智能体；
-- **绿点**：会话刚完成，而你还没打开看过。
-
-状态标记只在需要提示时出现。空闲会话也会在标题左侧留出相同的空间，让标题与工作区里的会话保持相同缩进，并且不随状态变化左右移动。
-
-## 发布
-
-发布 GitHub Release 后，[发布工作流](./.github/workflows/publish.yml) 会自动将该 tag 对应的包发布到 npm。tag 必须与 `package.json` 的版本一致，例如 `v1.0.1` 或 `1.0.1`。正式版使用 npm 的 `latest` 标签；预发布版使用 `next`，且 GitHub Release 必须标记为预发布。仅保存草稿或推送 tag 不会触发发布。
-
-首次使用前，在 npm 的 `dsh-up-session` 包设置中添加 GitHub Actions 可信发布者（[npm 官方说明](https://docs.npmjs.com/trusted-publishers/)）：
-
-- Organization or user：`kyrsieger`
-- Repository：`dsh-up-session`
-- Workflow filename：`publish.yml`
-- Environment name：留空
-- Allowed actions：允许直接执行 `npm publish`
-
-工作流使用 OIDC 认证，无需配置 `NPM_TOKEN`。先将工作流、版本号和更新日志提交并推送，再为该提交创建 tag 和发布 Release。发布失败时，可在 GitHub Actions 中重跑失败的任务；已成功发布的 npm 版本不能重复发布。
-
 ## 许可
 
 本项目基于 [MIT 许可证](./LICENSE) 授权。
