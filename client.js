@@ -151,7 +151,8 @@ window.__ModuleLoader__.load({
       '.dshUS-mount{box-sizing:border-box;flex:none;display:flex;flex-direction:column;gap:4px;',
       'padding-left:4px;margin:0 0 4px -4px}',
       '.dshUS-mount[data-rail="true"],.dshUS-mount[data-searching="true"]{display:none}',
-      '.dshUS-root{box-sizing:border-box;display:flex;flex-direction:column;gap:2px}',
+      '.dshUS-root{box-sizing:border-box;display:flex;flex-direction:column;gap:2px;',
+      '--dshUS-status-width:16px}',
       // The header copies the host's "Workspaces" section header: same box, same
       // 14px/20px label, same tertiary label colour. The whole row is the toggle,
       // and the settings entry floats over its right edge without taking space,
@@ -159,7 +160,10 @@ window.__ModuleLoader__.load({
       '.dshUS-headerRow{box-sizing:border-box;position:relative;display:flex;align-items:center;',
       'height:36px;margin:0 0 4px}',
       '.dshUS-header{box-sizing:border-box;display:flex;align-items:center;gap:4px;width:100%;',
-      'height:100%;margin:0;padding:0 4px 0 4px;border:0;background:0 0;font:inherit;',
+      // The mount's left edge matches the native header's. DSH uses the sidebar
+      // row padding for that header and shifts its label 1px back to the left.
+      'height:100%;margin:0;padding:0 4px 0 calc(var(--dsh-sidebar-row-padding,5px) - 1px);',
+      'border:0;background:0 0;font:inherit;',
       'text-align:left;color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:20px;',
       'overflow:hidden;user-select:none;cursor:pointer;border-radius:var(--dsw-radius-sm,4px)}',
       '.dshUS-header:hover,',
@@ -194,12 +198,11 @@ window.__ModuleLoader__.load({
       'transition:transform .15s var(--ds-ease-in-out);transform:rotate(0deg)}',
       '.dshUS-arrow[data-open="false"]{transform:rotate(-90deg)}',
       '@media (prefers-reduced-motion:reduce){.dshUS-arrow{transition:none}}',
-      // Row geometry copied from the host's session row: zero gap (the host's
-      // row sets `gap:0`), the title's own 4/6px margins around it, and a
-      // pin-sized 16x20 trailing box with a 6px lead — the same box the host's
-      // own pinned marker occupies.
+      // Like a top-level native session row, the title starts after the sidebar
+      // row inset, a reserved status slot, and the sidebar label gap.
       '.dshUS-row{box-sizing:border-box;display:flex;align-items:center;gap:0;height:32px;',
-      'padding:0 8px;border-radius:var(--dsw-radius-md,8px);cursor:pointer;font:inherit;',
+      'padding:0 8px 0 var(--dsh-sidebar-row-padding,12px);',
+      'border-radius:var(--dsw-radius-md,8px);cursor:pointer;font:inherit;',
       'font-size:14px;line-height:20px;color:var(--dsw-alias-label-primary);background:0 0;',
       'border:0;text-align:left;width:100%}',
       '.dshUS-row:hover{background:var(--dsw-alias-interactive-bg-hover)}',
@@ -209,16 +212,10 @@ window.__ModuleLoader__.load({
       '.dshUS-row:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:-2px}',
       '.dshUS-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;',
-      'margin:0 6px 0 4px;font-size:14px;line-height:20px}',
-      // The status cell sits at the row's leading edge, exactly where the
-      // sidebar reserves its own 16x20 slot, and appears only on a row that has
-      // something to report. An idle row renders no cell at all, so its title
-      // keeps the section's own left edge instead of the sidebar's deeper
-      // indent: the marker is what the user asked for, not a right shift on
-      // every quiet row. The relative time keeps its place, because it says
-      // when the row last moved rather than what it is doing.
+      'margin:0 6px 0 var(--dsh-sidebar-label-gap,6px);font-size:14px;line-height:20px}',
+      // Reserve the same space on idle rows so the title stays put as status changes.
       '.dshUS-status{flex:none;display:inline-flex;align-items:center;justify-content:center;',
-      'width:16px;height:20px;color:var(--dsw-alias-label-tertiary)}',
+      'width:var(--dshUS-status-width);height:20px;color:var(--dsw-alias-label-tertiary)}',
       // The host's ongoing loader: a 14px ring whose arc sweeps while the
       // Session runs, drawn with the primitives' own stroke recipe and easing
       // so both rows animate identically.
@@ -267,7 +264,7 @@ window.__ModuleLoader__.load({
       // sidebar's tertiary label colour.
       '.dshUS-empty{box-sizing:border-box;display:flex;align-items:center;height:32px;',
       'padding:0 8px;cursor:default}',
-      '.dshUS-emptyLabel{flex:1;min-width:0;margin:0 6px 0 4px;overflow:hidden;',
+      '.dshUS-emptyLabel{flex:1;min-width:0;margin:0 6px 0;overflow:hidden;',
       'text-overflow:ellipsis;white-space:nowrap;font-size:14px;line-height:20px;',
       'color:var(--dsw-alias-label-tertiary)}',
       // The host's own "Show more" row: one full-width 28px text button whose
@@ -276,6 +273,8 @@ window.__ModuleLoader__.load({
       'padding:0 12px;border:0;border-radius:var(--dsw-radius-sm,4px);background:0 0;font:inherit;',
       'font-size:12px;line-height:18px;text-align:left;color:var(--dsw-alias-label-tertiary);',
       'cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.dshUS-empty,.dshUS-more{padding-left:calc(var(--dsh-sidebar-row-padding,12px) + ',
+      'var(--dshUS-status-width) + var(--dsh-sidebar-label-gap,6px))}',
       '.dshUS-more:hover{color:var(--dsw-alias-label-secondary)}',
       '.dshUS-more:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:-2px}',
@@ -1262,9 +1261,6 @@ window.__ModuleLoader__.load({
      */
     function SessionRow({ row, currentId, onOpen, onOpenMenu, menuOpen, actions, pinned, t }) {
       const now = Date.now();
-      // A live status is the row's own leading cell, exactly as the sidebar
-      // draws it; an idle row draws none, so quiet rows keep the section's left
-      // edge instead of the sidebar's deeper indent.
       const statusLabel = row.status === undefined ? undefined : statusText(row.status, t);
       // Same capture the host's session rows use: right-click, the Context Menu
       // key, or Shift+F10 open the shared session menu at the pointer or the row.
@@ -1318,8 +1314,9 @@ window.__ModuleLoader__.load({
             onOpen(row);
           },
         },
-        row.status !== undefined &&
-          h(StatusMark, { status: row.status, label: statusLabel }),
+        row.status === undefined
+          ? h('span', { className: 'dshUS-status', 'aria-hidden': 'true' })
+          : h(StatusMark, { status: row.status, label: statusLabel }),
         h('span', { className: 'dshUS-title' }, row.title),
         h('span', { className: 'dshUS-time' }, relativeTime(row.updatedAt, now, t)),
         pinned === true &&

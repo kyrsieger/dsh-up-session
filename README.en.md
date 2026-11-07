@@ -85,7 +85,7 @@ Rows in both sections read the same live status as the sidebar's own session row
 - **spinner**: the session is running, either its own turn or a subagent it still has working;
 - **green dot**: the session just finished and you have not opened it yet.
 
-The marker sits at the left of the title and appears only when there is something to report, so an idle row keeps its original left edge; the archive and pin buttons still appear on hover where they always did.
+The marker appears only when there is something to report. Idle rows reserve the same space to the left of the title, matching the workspace list's session indent and keeping titles from shifting when the status changes.
 
 ## Publishing
 
