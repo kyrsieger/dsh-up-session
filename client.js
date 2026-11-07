@@ -49,8 +49,10 @@ window.__ModuleLoader__.load({
       archiveNamed: '归档 {title}',
       openNamed: '打开 {title}',
       openNamedStatus: '打开 {title}（{status}）',
+      'hover.ungrouped': '未分组',
       'status.running': '进行中',
       'status.completed': '已完成',
+      'status.idle': '空闲',
       'status.waitingApproval': '等待审批',
       'status.planReview': '计划待审',
       'status.waitingAnswer': '等待回答',
@@ -80,6 +82,7 @@ window.__ModuleLoader__.load({
       'time.days': '{n}天',
       'time.months': '{n}个月',
       'time.years': '{n}年',
+      'time.ago': '{t}前',
     };
     /** English dictionary checked against the Chinese key set. */
     const en = {
@@ -121,8 +124,10 @@ window.__ModuleLoader__.load({
       archiveNamed: 'Archive {title}',
       openNamed: 'Open {title}',
       openNamedStatus: 'Open {title} ({status})',
+      'hover.ungrouped': 'Ungrouped',
       'status.running': 'Running',
       'status.completed': 'Completed',
+      'status.idle': 'Idle',
       'status.waitingApproval': 'Waiting for approval',
       'status.planReview': 'Plan awaiting review',
       'status.waitingAnswer': 'Waiting for answer',
@@ -152,6 +157,7 @@ window.__ModuleLoader__.load({
       'time.days': '{n}d',
       'time.months': '{n}mo',
       'time.years': '{n}y',
+      'time.ago': '{t} ago',
     };
 
     /** Stylesheet, scoped to this plugin's own class names. */
@@ -248,10 +254,30 @@ window.__ModuleLoader__.load({
       'corner-shape:round;background:currentColor}',
       '.dshUS-dot[data-state="done"]{color:var(--dsw-alias-state-success-primary)}',
       '.dshUS-dot[data-state="warning"]{color:var(--dsw-alias-state-warn-primary)}',
+      '.dshUS-dot[data-state="idle"]{color:var(--dsw-alias-state-idle-primary)}',
       '@media (prefers-reduced-motion:reduce){.dshUS-spinnerMotion,.dshUS-spinnerArc{animation:none}',
       '.dshUS-spinnerArc{stroke-dasharray:18 150;stroke-dashoffset:-3}}',
       '.dshUS-time{flex:none;margin:0;color:var(--dsw-alias-label-tertiary);font-size:10px;',
       'line-height:16px}',
+      // The hover card copies the host's own Session hover card: a fixed 244px
+      // dark surface hanging to the right of the row, with the same 14px title
+      // and 12px details. Its colors are the host card's fixed ones rather than
+      // theme tokens, because the card is dark in every theme. It takes pointer
+      // events like the host's card, so moving onto it keeps it open to read.
+      '.dshUS-hoverCard{position:fixed;z-index:100;box-sizing:border-box;width:244px;',
+      'max-width:calc(100vw - 16px);padding:12px 16px;',
+      'border-radius:var(--dsw-radius-lg,8px);background:#2c2c2e;',
+      'box-shadow:var(--dsw-shadow-lv3,0 8px 32px rgba(0,0,0,.24));',
+      'display:flex;flex-direction:column;gap:8px}',
+      '.dshUS-hoverTitle{color:#fff;overflow-wrap:break-word;font-size:14px;line-height:20px}',
+      // The one field these sections add to the host card: the Workspace that
+      // owns the Session, named by its (renamable) title rather than its folder.
+      // It carries no label; the bare title reads as the Session's context.
+      '.dshUS-hoverWorkspace{color:#cfd3d6;overflow-wrap:anywhere;font-size:12px;line-height:16px}',
+      '.dshUS-hoverPath{color:#cfd3d6;word-break:break-all;font-size:12px;line-height:16px}',
+      '.dshUS-hoverTime{color:#cfd3d6;font-size:12px;line-height:16px}',
+      '.dshUS-hoverStatus{display:flex;align-items:center;gap:8px;color:#adb2b8;',
+      'font-size:12px;line-height:20px}',
       // The host's own pinned marker, kept on the row at rest exactly as the
       // sidebar keeps its marker on a pinned Session: same 16px box, same 6px
       // lead, same caption colour. It is the trailing cell of a pinned row, so
@@ -647,6 +673,32 @@ window.__ModuleLoader__.load({
       return undefined;
     }
 
+    /**
+     * Every status line one Session's hover card lists, in the host card's own
+     * precedence: a pending interaction first, then live activity (its own turn
+     * or a running child), then an unviewed completion, and finally idle — which
+     * the row never marks but the card always states. A pending interaction
+     * outranks the Session's own turn, so the two never share the leading line,
+     * while a running child keeps its own second line beside either.
+     * @param sessions - the Session-list snapshot.
+     * @param statuses - the Session-status snapshot.
+     * @param sessionId - the Session to describe.
+     * @returns the status lines, at least the idle one.
+     */
+    function sessionHoverStatuses(sessions, statuses, sessionId) {
+      const status = statuses.get(sessionId);
+      const pending = pendingStatus(status?.pendingInteraction?.kind);
+      const running = status?.running ?? sessions.byId[sessionId]?.running;
+      const children = runningChildCount(sessions, sessionId, statuses);
+      const lines = [];
+      if (pending !== undefined) lines.push({ state: 'warning', label: pending });
+      else if (running === true) lines.push({ state: 'ongoing', label: 'running' });
+      if (children > 0) lines.push({ state: 'ongoing', label: 'subagents', count: children });
+      if (lines.length > 0) return lines;
+      if (status?.completionUnread === true) return [{ state: 'done', label: 'completed' }];
+      return [{ state: 'idle', label: 'idle' }];
+    }
+
     /** The readable text of one primary status, localized by the section. */
     function statusText(status, t) {
       if (status.label === 'subagents') {
@@ -669,25 +721,37 @@ window.__ModuleLoader__.load({
       return h(
         'span',
         { className: 'dshUS-status', title: label, 'aria-hidden': 'true' },
-        status.state === 'ongoing'
-          ? h(
-              'svg',
-              {
-                className: 'dshUS-spinner',
-                'data-state': 'ongoing',
-                width: 14,
-                height: 14,
-                viewBox: '0 0 24 24',
-                'aria-hidden': 'true',
-              },
-              h(
-                'g',
-                { className: 'dshUS-spinnerMotion' },
-                h('circle', { className: 'dshUS-spinnerTrack', cx: '12', cy: '12', r: '9.5' }),
-                h('circle', { className: 'dshUS-spinnerArc', cx: '12', cy: '12', r: '9.5' }),
-              ),
-            )
-          : h('span', { className: 'dshUS-dot', 'data-state': status.state }),
+        h(StatusGlyph, { status }),
+      );
+    }
+
+    /**
+     * One status's mark without the row's reserved 16px cell: the host's
+     * spinning ring while the Session works, otherwise its small state dot.
+     * The hover card lines up these marks the way its own status lines do.
+     * @param props - the status to draw.
+     * @returns the marker element.
+     */
+    function StatusGlyph({ status }) {
+      if (status.state !== 'ongoing') {
+        return h('span', { className: 'dshUS-dot', 'data-state': status.state });
+      }
+      return h(
+        'svg',
+        {
+          className: 'dshUS-spinner',
+          'data-state': 'ongoing',
+          width: 14,
+          height: 14,
+          viewBox: '0 0 24 24',
+          'aria-hidden': 'true',
+        },
+        h(
+          'g',
+          { className: 'dshUS-spinnerMotion' },
+          h('circle', { className: 'dshUS-spinnerTrack', cx: '12', cy: '12', r: '9.5' }),
+          h('circle', { className: 'dshUS-spinnerArc', cx: '12', cy: '12', r: '9.5' }),
+        ),
       );
     }
 
@@ -866,21 +930,44 @@ window.__ModuleLoader__.load({
       });
     }
 
-    /** Compact relative time of one row's last activity. */
-    function relativeTime(value, now, t) {
+    /**
+     * The relative-time bucket of one row's last activity, before it is put in
+     * either the row's compact form (「5分钟」) or the hover card's form
+     * (「5分钟前」).
+     * @param value - the Session's activity stamp.
+     * @param now - the current time in epoch milliseconds.
+     * @returns the unit and count, or undefined for a missing stamp.
+     */
+    function relativeTimeParts(value, now) {
       const then = toMillis(value);
-      if (then === 0) return '';
+      if (then === 0) return undefined;
       const diff = Math.max(0, now - then);
       const minutes = Math.floor(diff / 60000);
-      if (minutes < 1) return t('time.now');
-      if (minutes < 60) return t('time.minutes', { n: minutes });
+      if (minutes < 1) return { unit: 'now' };
+      if (minutes < 60) return { unit: 'minutes', n: minutes };
       const hours = Math.floor(minutes / 60);
-      if (hours < 24) return t('time.hours', { n: hours });
+      if (hours < 24) return { unit: 'hours', n: hours };
       const days = Math.floor(hours / 24);
-      if (days < 30) return t('time.days', { n: days });
+      if (days < 30) return { unit: 'days', n: days };
       const months = Math.floor(days / 30);
-      if (months < 12) return t('time.months', { n: months });
-      return t('time.years', { n: Math.floor(months / 12) });
+      if (months < 12) return { unit: 'months', n: months };
+      return { unit: 'years', n: Math.floor(months / 12) };
+    }
+
+    /** Compact relative time of one row's last activity. */
+    function relativeTime(value, now, t) {
+      const parts = relativeTimeParts(value, now);
+      if (parts === undefined) return '';
+      return parts.unit === 'now' ? t('time.now') : t(`time.${parts.unit}`, { n: parts.n });
+    }
+
+    /** Hover-card relative time: the same distance written as 「5分钟前」. */
+    function hoverTime(value, now, t) {
+      const parts = relativeTimeParts(value, now);
+      if (parts === undefined) return '';
+      return parts.unit === 'now'
+        ? t('time.now')
+        : t('time.ago', { t: t(`time.${parts.unit}`, { n: parts.n }) });
     }
 
     /**
@@ -892,6 +979,15 @@ window.__ModuleLoader__.load({
     const RECENT_PAGE_MIN = 1;
     const RECENT_PAGE_MAX = 50;
     const RECENT_PAGE_STEP = 5;
+    /**
+     * Hover-card timing and gap, copied from the host's own Session card: the
+     * first card in a list waits 800ms, a neighbouring row then replaces an open
+     * one immediately, and leaving the row and the card waits 100ms before the
+     * card closes.
+     */
+    const HOVER_CARD_DELAY = 800;
+    const HOVER_CARD_CLOSE_DELAY = 100;
+    const HOVER_CARD_GAP = 8;
     /** localStorage key holding this plugin's browser-local preferences. */
     const PREFERENCES_KEY = 'dsh-up-session/preferences.v1';
 
@@ -1000,10 +1096,18 @@ window.__ModuleLoader__.load({
         // Before that, leave it unknown so nothing is guessed.
         workspaceId: owner?.workspaceId ?? (loaded ? '' : undefined),
         updatedAt: toMillis(summary.updatedAt),
+        // The Session's own working directory, which the host's hover card shows
+        // under the title. The Host omits it for a Session that reports none.
+        cwd: typeof summary.cwd === 'string' && summary.cwd !== '' ? summary.cwd : undefined,
         // Undefined while the Session is idle, and for the provisional New
         // Session blank: the row then draws no leading marker at all, which is
         // also how the sidebar renders both of those rows.
         status: summary.blank ? undefined : sessionStatus(sessions, statuses, summary.id),
+        // Unlike the row marker, the hover card always states a status, idle
+        // included, and names a running child beside the leading line.
+        hoverStatuses: summary.blank
+          ? []
+          : sessionHoverStatuses(sessions, statuses, summary.id),
       };
     }
 
@@ -1085,9 +1189,10 @@ window.__ModuleLoader__.load({
 
     /**
      * The root of the plugin's sidebar surface: the pinned section, the recent
-     * section, and the one archive confirmation both sections can raise. It is
-     * rendered through a portal into the host node the plugin keeps at the top
-     * of the workspace list, inside the "Workspaces" section.
+     * section, their one shared hover card, and the one archive confirmation
+     * both sections can raise. It is rendered through a portal into the host
+     * node the plugin keeps at the top of the workspace list, inside the
+     * "Workspaces" section.
      * @param props - composed slot props plus the injected host and actions.
      * @returns the portal, or null when there is nowhere to portal into.
      */
@@ -1149,7 +1254,67 @@ window.__ModuleLoader__.load({
           return next;
         });
       };
+      // The one shared hover card. Rows never each own a portal: the pointer's
+      // current row and the card's viewport position live here, so two rows can
+      // hand the card over without a gap. The host's own dwell is copied: the
+      // first card waits 800ms, a neighbouring row replaces an open one at once,
+      // and leaving the row and card waits 100ms before it closes.
+      const [hoverCard, setHoverCard] = React.useState(null);
+      const hoverDelay = React.useRef(0);
+      const hoverCloseDelay = React.useRef(0);
+      const hoverWarm = React.useRef(false);
+      const hideHover = React.useCallback(() => {
+        window.clearTimeout(hoverDelay.current);
+        window.clearTimeout(hoverCloseDelay.current);
+        hoverDelay.current = 0;
+        hoverCloseDelay.current = 0;
+        hoverWarm.current = false;
+        setHoverCard(null);
+      }, []);
+      const revealHover = React.useCallback((sessionId, element) => {
+        if (!(element instanceof HTMLElement) || !element.isConnected) return;
+        const rect = element.getBoundingClientRect();
+        hoverWarm.current = true;
+        setHoverCard({ id: sessionId, element, left: rect.right + HOVER_CARD_GAP, top: rect.top });
+      }, []);
+      const beginHover = React.useCallback(
+        (row, element) => {
+          window.clearTimeout(hoverDelay.current);
+          window.clearTimeout(hoverCloseDelay.current);
+          hoverDelay.current = 0;
+          hoverCloseDelay.current = 0;
+          if (hoverWarm.current) {
+            revealHover(row.id, element);
+            return;
+          }
+          hoverDelay.current = window.setTimeout(() => {
+            hoverDelay.current = 0;
+            revealHover(row.id, element);
+          }, HOVER_CARD_DELAY);
+        },
+        [revealHover],
+      );
+      const endHover = React.useCallback(() => {
+        window.clearTimeout(hoverDelay.current);
+        window.clearTimeout(hoverCloseDelay.current);
+        hoverDelay.current = 0;
+        hoverCloseDelay.current = window.setTimeout(() => {
+          hoverCloseDelay.current = 0;
+          hoverWarm.current = false;
+          setHoverCard(null);
+        }, HOVER_CARD_CLOSE_DELAY);
+      }, []);
+      // Entering the card cancels the dwell started when the pointer left the
+      // row, so the card stays put while it is being read; it closes once the
+      // pointer leaves both again.
+      const keepHover = React.useCallback(() => {
+        window.clearTimeout(hoverDelay.current);
+        window.clearTimeout(hoverCloseDelay.current);
+        hoverDelay.current = 0;
+        hoverCloseDelay.current = 0;
+      }, []);
       const raiseArchive = (row) => {
+        hideHover();
         archive(row.id)
           .then((result) => {
             if (!result.refused) return;
@@ -1171,6 +1336,7 @@ window.__ModuleLoader__.load({
       // group's current collapsed state so the sidebar's own current-Session
       // expansion cannot unfold it either.
       const openRow = (row) => {
+        hideHover();
         if (expandWorkspaceOnOpen) expandWorkspacePath(workspaces, row.workspaceId);
         else pinCollapsedWorkspace(row.workspaceId);
         openSession(row.id);
@@ -1234,6 +1400,71 @@ window.__ModuleLoader__.load({
       const menuSessionId = readMenuTarget(
         (target) => (target?.kind === 'session' ? target.value.sessionId : undefined),
       );
+      // A card never floats over an open menu or a modal dialog, exactly as the
+      // host hides its own card while a Session row menu is open.
+      React.useEffect(() => {
+        if (menuSessionId !== undefined || settingsOpen || archiveRequest !== null) hideHover();
+      }, [menuSessionId, settingsOpen, archiveRequest, hideHover]);
+      // Resolve the card's Session from the current lists, so a status change or
+      // a Workspace assignment reaches the open card without reopening it.
+      const hoveredRow = React.useMemo(() => {
+        if (hoverCard === null) return undefined;
+        return (
+          pinned.find((row) => row.id === hoverCard.id) ??
+          recent.find((row) => row.id === hoverCard.id)
+        );
+      }, [hoverCard, pinned, recent]);
+      // The sidebar scrolls, and a row can disappear (unpinned into a collapsed
+      // section, archived, folded, or its whole section hidden) while its card is
+      // open. This check runs after every render because those unmounts happen
+      // inside the sections' own state, which the root never sees.
+      React.useEffect(() => {
+        if (hoverCard === null) return;
+        if (hoveredRow === undefined || !hoverCard.element.isConnected) hideHover();
+      });
+      const hoverAnchor = hoverCard === null ? undefined : hoverCard.element;
+      React.useEffect(() => {
+        if (hoverAnchor === undefined) return undefined;
+        let frame = 0;
+        const place = () => {
+          frame = 0;
+          if (!hoverAnchor.isConnected) {
+            hideHover();
+            return;
+          }
+          const rect = hoverAnchor.getBoundingClientRect();
+          const left = rect.right + HOVER_CARD_GAP;
+          const top = rect.top;
+          setHoverCard((current) =>
+            current === null || current.element !== hoverAnchor
+              ? current
+              : current.left === left && current.top === top
+                ? current
+                : { ...current, left, top },
+          );
+        };
+        const schedule = () => {
+          if (frame === 0) frame = requestAnimationFrame(place);
+        };
+        window.addEventListener('scroll', schedule, true);
+        window.addEventListener('resize', schedule);
+        return () => {
+          if (frame !== 0) cancelAnimationFrame(frame);
+          window.removeEventListener('scroll', schedule, true);
+          window.removeEventListener('resize', schedule);
+        };
+      }, [hoverAnchor, hideHover]);
+      const hoverCardElement =
+        hoverCard !== null && hoveredRow !== undefined
+          ? h(SessionHoverCard, {
+              key: hoveredRow.id,
+              card: hoverCard,
+              row: hoveredRow,
+              onEnter: keepHover,
+              onLeave: endHover,
+              t,
+            })
+          : null;
       const shared = {
         currentId,
         onOpen: openRow,
@@ -1242,6 +1473,8 @@ window.__ModuleLoader__.load({
         menuSessionId,
         onOpenSettings: () => setSettingsOpen(true),
         settingsOpen,
+        onHoverStart: beginHover,
+        onHoverEnd: endHover,
         t,
       };
 
@@ -1261,6 +1494,7 @@ window.__ModuleLoader__.load({
         }),
         settingsDialog,
         dialog,
+        hoverCardElement,
       );
 
       return host === null ? null : createPortal(body, host);
@@ -1327,11 +1561,23 @@ window.__ModuleLoader__.load({
      * relative time, and the trailing actions that replace the time on hover or
      * keyboard focus. A pinned row keeps the host's own pin marker where the
      * time would end, so a pinned row looks pinned at rest exactly as the
-     * sidebar's rows do.
-     * @param props - the row, the current Session id, the open handler, the host menu opener, the trailing buttons, the pin marker, and the translator.
+     * sidebar's rows do. Hovering the row starts the dwell that reveals the
+     * shared hover card; no native `title` tooltip competes with it.
+     * @param props - the row, the current Session id, the open handler, the host menu opener, the trailing buttons, the pin marker, the hover hooks, and the translator.
      * @returns the row element.
      */
-    function SessionRow({ row, currentId, onOpen, onOpenMenu, menuOpen, actions, pinned, t }) {
+    function SessionRow({
+      row,
+      currentId,
+      onOpen,
+      onOpenMenu,
+      menuOpen,
+      actions,
+      pinned,
+      onHoverStart,
+      onHoverEnd,
+      t,
+    }) {
       const now = Date.now();
       const statusLabel = row.status === undefined ? undefined : statusText(row.status, t);
       // Same capture the host's session rows use: right-click, the Context Menu
@@ -1354,12 +1600,19 @@ window.__ModuleLoader__.load({
           tabIndex: 0,
           'aria-current': row.id === currentId ? 'true' : undefined,
           'aria-haspopup': 'menu',
-          title: row.workspace === '' ? row.title : `${row.title} · ${row.workspace}`,
           'aria-label':
             statusLabel === undefined
               ? t('openNamed', { title: row.title })
               : t('openNamedStatus', { title: row.title, status: statusLabel }),
           onClick: () => onOpen(row),
+          // Only a mouse on a hover-capable device starts the card, exactly as
+          // the host's rows do; touch and pen have no hover to dwell on.
+          onPointerEnter: (event) => {
+            if (event.pointerType !== 'mouse') return;
+            if (!window.matchMedia('(any-hover: hover)').matches) return;
+            onHoverStart(row, event.currentTarget);
+          },
+          onPointerLeave: onHoverEnd,
           onContextMenu: (event) => {
             const keyboard = event.clientX === 0 && event.clientY === 0;
             const rect = keyboard ? event.currentTarget.getBoundingClientRect() : undefined;
@@ -1433,6 +1686,80 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /**
+     * The hover card of one Session row: the host Session card's fields — full
+     * title, working directory, relative time, and every live status, idle
+     * included — plus the one field these sections add, the Workspace that owns
+     * the Session. The Workspace is named by its title, which the user can
+     * rename, never by its directory name. The card portals to the body because
+     * the sidebar's scroll box would clip it, and it hangs to the right of the
+     * row like the host's own card, moving up when it would leave the viewport.
+     * Entering the card holds it open while the pointer reads it; leaving it
+     * starts the same close dwell as leaving the row.
+     * @param props - the anchor position, the row, the pointer hooks, and the translator.
+     * @returns the portaled card.
+     */
+    function SessionHoverCard({ card, row, onEnter, onLeave, t }) {
+      const node = React.useRef(null);
+      const [placement, setPlacement] = React.useState({ left: card.left, top: card.top });
+      React.useLayoutEffect(() => {
+        const element = node.current;
+        if (element === null) return undefined;
+        // Same viewport guards as the host's compact card: keep the whole card
+        // on screen when the row sits near the window's right or bottom edge.
+        // The observer reapplies them when the content grows (a Workspace line
+        // arriving, a second status line, a longer title).
+        const place = () => {
+          const left = Math.max(8, Math.min(card.left, window.innerWidth - element.offsetWidth - 8));
+          const top = Math.max(8, Math.min(card.top, window.innerHeight - element.offsetHeight - 8));
+          setPlacement((current) =>
+            current.left === left && current.top === top ? current : { left, top },
+          );
+        };
+        place();
+        const observer = new ResizeObserver(place);
+        observer.observe(element);
+        return () => observer.disconnect();
+      }, [card.left, card.top, row.id]);
+      const now = Date.now();
+      const time = hoverTime(row.updatedAt, now, t);
+      // An unknown owner (the Workspace list has not loaded) omits the field; a
+      // loaded list with no owner means the Session sits in "Ungrouped".
+      const workspace =
+        row.workspaceId === undefined
+          ? undefined
+          : row.workspace === ''
+            ? t('hover.ungrouped')
+            : row.workspace;
+      return createPortal(
+        h(
+          'div',
+          {
+            ref: node,
+            className: 'dshUS-hoverCard',
+            role: 'tooltip',
+            style: { left: placement.left, top: placement.top },
+            onPointerEnter: onEnter,
+            onPointerLeave: onLeave,
+          },
+          h('div', { className: 'dshUS-hoverTitle' }, row.title),
+          workspace !== undefined &&
+            h('div', { className: 'dshUS-hoverWorkspace' }, workspace),
+          row.cwd !== undefined && h('div', { className: 'dshUS-hoverPath' }, row.cwd),
+          time !== '' && h('div', { className: 'dshUS-hoverTime' }, time),
+          row.hoverStatuses.map((status) =>
+            h(
+              'div',
+              { className: 'dshUS-hoverStatus', key: `${status.label}-${status.count ?? ''}` },
+              h(StatusGlyph, { status }),
+              h('span', null, statusText(status, t)),
+            ),
+          ),
+        ),
+        document.body,
+      );
+    }
+
     /** The archive button every row owns, built from one row's identity. */
     function archiveAction(row, onArchive, t) {
       return {
@@ -1460,6 +1787,8 @@ window.__ModuleLoader__.load({
       menuSessionId,
       onOpenSettings,
       settingsOpen,
+      onHoverStart,
+      onHoverEnd,
       t,
     }) {
       // Expanded by default; the choice lasts for this mount. Nothing is
@@ -1491,6 +1820,8 @@ window.__ModuleLoader__.load({
                   onOpen,
                   onOpenMenu,
                   menuOpen: menuSessionId === row.id,
+                  onHoverStart,
+                  onHoverEnd,
                   t,
                   // Every row here is pinned, so every row wears the marker.
                   pinned: true,
@@ -1528,6 +1859,8 @@ window.__ModuleLoader__.load({
       menuSessionId,
       onOpenSettings,
       settingsOpen,
+      onHoverStart,
+      onHoverEnd,
       t,
     }) {
       const [expanded, setExpanded] = React.useState(true);
@@ -1578,6 +1911,8 @@ window.__ModuleLoader__.load({
                   onOpen,
                   onOpenMenu,
                   menuOpen: menuSessionId === row.id,
+                  onHoverStart,
+                  onHoverEnd,
                   t,
                   // No row here is pinned, so no row wears the marker and the
                   // time is the row's trailing cell, flush with its edge.

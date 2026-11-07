@@ -65,6 +65,12 @@ Sits between the pinned section and the workspace rows, lists the sessions that 
 
 Hovering a row reveals its archive and pin buttons. The context menu is the same as in the pinned section. Pinned sessions appear only in the pinned section, so no conversation is listed twice.
 
+## Session hover card
+
+Resting the pointer on a row in Pinned or Recent for about 0.8 seconds opens the same Session hover card as a row in the workspace list: the full session title, working directory, relative time, and current status. Idle sessions read "Idle", and a pending interaction or running subagents get their own lines. The card also adds the title of the workspace that owns the session right below the session title — the renamable workspace title, not the project folder name.
+
+The card's time and status come from the same data as the workspace list. Moving to a neighbouring row replaces the card immediately, and leaving both closes it. Touch devices have no hover and show no card.
+
 ## Settings
 
 Each section header carries a gear at its right edge, shown while the pointer is over the header. Clicking it opens this plugin's settings popup, styled like DSH's own settings page.
