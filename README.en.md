@@ -17,7 +17,7 @@ A simple DeepSeek Harness sidebar plugin: it inserts two groups, "Pinned" and "R
 
 **Upgrade to DSH 0.2.2-alpha.3 or later. This plugin uses the session menu API introduced in that version.**
 
-Plugin version 1.0.4 requires DSH `>=0.2.2-alpha.3`. Installing it on an earlier DSH version may prevent DSH from starting.
+Plugin version 1.1.0 requires DSH `>=0.2.2-alpha.3`. Installing it on an earlier DSH version may prevent DSH from starting.
 
 **Web**
 
