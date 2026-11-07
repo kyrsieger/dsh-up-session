@@ -7,8 +7,8 @@ window.__ModuleLoader__.load({
 
     /** Dictionary namespace owned by this plugin. */
     const NS = 'upSession';
-    /** Services required to read pin state, render, and pin, unpin, or archive. */
-    const inject = ['slots', 'locale', 'uiWorkspace'];
+    /** Services required to read pin state, render, pin, unpin, archive, and open the host session menu. */
+    const inject = ['slots', 'locale', 'uiWorkspace', 'contextMenus'];
 
     /** Simplified Chinese dictionary and key source of truth. */
     const zh = {
@@ -204,7 +204,7 @@ window.__ModuleLoader__.load({
       'border:0;text-align:left;width:100%}',
       '.dshUS-row:hover{background:var(--dsw-alias-interactive-bg-hover)}',
       // Matches the sidebar's own selected row (same surface, same label weight).
-      '.dshUS-current{background:var(--dsw-alias-interactive-bg-hover);',
+      '.dshUS-current,.dshUS-menuOpen{background:var(--dsw-alias-interactive-bg-hover);',
       'color:var(--dsw-alias-label-primary)}',
       '.dshUS-row:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:-2px}',
@@ -290,7 +290,8 @@ window.__ModuleLoader__.load({
       'color:var(--dsw-alias-label-caption,currentColor)}',
       '.dshUS-row:hover .dshUS-actions,',
       '.dshUS-row:focus-visible .dshUS-actions,',
-      '.dshUS-row:focus-within .dshUS-actions{display:inline-flex}',
+      '.dshUS-row:focus-within .dshUS-actions,',
+      '.dshUS-menuOpen .dshUS-actions{display:inline-flex}',
       '.dshUS-action:hover{color:var(--dsw-alias-label-primary)}',
       '.dshUS-action:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:1px}',
@@ -303,7 +304,9 @@ window.__ModuleLoader__.load({
       '.dshUS-row:focus-within .dshUS-time,',
       '.dshUS-row:hover .dshUS-pinMark,',
       '.dshUS-row:focus-visible .dshUS-pinMark,',
-      '.dshUS-row:focus-within .dshUS-pinMark{display:none}',
+      '.dshUS-row:focus-within .dshUS-pinMark,',
+      '.dshUS-menuOpen .dshUS-time,',
+      '.dshUS-menuOpen .dshUS-pinMark{display:none}',
       // A touch surface never hovers, so the actions stay visible there and the
       // time and marker stay hidden with them.
       '@media (hover:none){.dshUS-actions{display:inline-flex}',
@@ -544,6 +547,8 @@ window.__ModuleLoader__.load({
     const NO_STATUSES = new Map();
     /** Stand-in for a host without the status hook, so the sections still render. */
     const useNoSessionStatus = (selector) => selector(NO_STATUSES);
+    /** Used when the host has no context-menu target store; the row still opens the menu. */
+    const useNoContextMenuTarget = () => undefined;
 
     /**
      * The pending-interaction kind the sidebar renders, or undefined for a kind
@@ -917,6 +922,8 @@ window.__ModuleLoader__.load({
       return {
         id: summary.id,
         title: summary.displayTitle || untitled,
+        // The host menu's rename draft is the raw title, not the untitled label.
+        menuTitle: summary.blank ? '' : summary.title?.trim() ?? '',
         workspace: owner?.title ?? '',
         // A known owner names its Workspace; once the list has loaded, a Session
         // no Workspace accounts for sits in the "Ungrouped" bucket (`''`).
@@ -1028,6 +1035,8 @@ window.__ModuleLoader__.load({
         useSessionStatus,
         usePanelInfo,
         settingsEvents,
+        openMenu,
+        useContextMenuTarget,
       } = props;
       const pinnedSessionIds = useWorkspaces((state) => state.pinnedSessionIds);
       const archivedSessionIds = useWorkspaces((state) => state.archivedSessionIds);
@@ -1149,10 +1158,18 @@ window.__ModuleLoader__.load({
           t,
         });
 
+      // The host menu's captured target, so the row that opened it stays marked
+      // after the pointer leaves. Undefined until a session menu is open.
+      const readMenuTarget = useContextMenuTarget ?? useNoContextMenuTarget;
+      const menuSessionId = readMenuTarget(
+        (target) => (target?.kind === 'session' ? target.value.sessionId : undefined),
+      );
       const shared = {
         currentId,
         onOpen: openRow,
         onArchive: raiseArchive,
+        onOpenMenu: openMenu,
+        menuSessionId,
         onOpenSettings: () => setSettingsOpen(true),
         settingsOpen,
         t,
@@ -1240,29 +1257,62 @@ window.__ModuleLoader__.load({
      * keyboard focus. A pinned row keeps the host's own pin marker where the
      * time would end, so a pinned row looks pinned at rest exactly as the
      * sidebar's rows do.
-     * @param props - the row, the current Session id, the open handler, the trailing buttons, the pin marker, and the translator.
+     * @param props - the row, the current Session id, the open handler, the host menu opener, the trailing buttons, the pin marker, and the translator.
      * @returns the row element.
      */
-    function SessionRow({ row, currentId, onOpen, actions, pinned, t }) {
+    function SessionRow({ row, currentId, onOpen, onOpenMenu, menuOpen, actions, pinned, t }) {
       const now = Date.now();
       // A live status is the row's own leading cell, exactly as the sidebar
       // draws it; an idle row draws none, so quiet rows keep the section's left
       // edge instead of the sidebar's deeper indent.
       const statusLabel = row.status === undefined ? undefined : statusText(row.status, t);
+      // Same capture the host's session rows use: right-click, the Context Menu
+      // key, or Shift+F10 open the shared session menu at the pointer or the row.
+      const showMenu = (point, event) => {
+        if (typeof onOpenMenu !== 'function') return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus({ preventScroll: true });
+        onOpenMenu(row.id, row.menuTitle ?? '', point);
+      };
+      const className = ['dshUS-row', row.id === currentId ? 'dshUS-current' : '', menuOpen ? 'dshUS-menuOpen' : '']
+        .filter(Boolean)
+        .join(' ');
       return h(
         'div',
         {
-          className: row.id === currentId ? 'dshUS-row dshUS-current' : 'dshUS-row',
+          className,
           role: 'button',
           tabIndex: 0,
           'aria-current': row.id === currentId ? 'true' : undefined,
+          'aria-haspopup': 'menu',
           title: row.workspace === '' ? row.title : `${row.title} · ${row.workspace}`,
           'aria-label':
             statusLabel === undefined
               ? t('openNamed', { title: row.title })
               : t('openNamedStatus', { title: row.title, status: statusLabel }),
           onClick: () => onOpen(row),
+          onContextMenu: (event) => {
+            const keyboard = event.clientX === 0 && event.clientY === 0;
+            const rect = keyboard ? event.currentTarget.getBoundingClientRect() : undefined;
+            showMenu(
+              { x: rect?.left ?? event.clientX, y: rect?.bottom ?? event.clientY },
+              event,
+            );
+          },
           onKeyDown: (event) => {
+            if (
+              !event.repeat &&
+              !event.nativeEvent.isComposing &&
+              !event.ctrlKey &&
+              !event.altKey &&
+              !event.metaKey &&
+              (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey))
+            ) {
+              const rect = event.currentTarget.getBoundingClientRect();
+              showMenu({ x: rect.left, y: rect.bottom }, event);
+              return;
+            }
             if (event.key !== 'Enter' && event.key !== ' ') return;
             event.preventDefault();
             onOpen(row);
@@ -1337,6 +1387,8 @@ window.__ModuleLoader__.load({
       onOpen,
       onArchive,
       onUnpin,
+      onOpenMenu,
+      menuSessionId,
       onOpenSettings,
       settingsOpen,
       t,
@@ -1368,6 +1420,8 @@ window.__ModuleLoader__.load({
                   row,
                   currentId,
                   onOpen,
+                  onOpenMenu,
+                  menuOpen: menuSessionId === row.id,
                   t,
                   // Every row here is pinned, so every row wears the marker.
                   pinned: true,
@@ -1399,6 +1453,8 @@ window.__ModuleLoader__.load({
       onOpen,
       onArchive,
       onPin,
+      onOpenMenu,
+      menuSessionId,
       onOpenSettings,
       settingsOpen,
       t,
@@ -1447,6 +1503,8 @@ window.__ModuleLoader__.load({
                   row,
                   currentId,
                   onOpen,
+                  onOpenMenu,
+                  menuOpen: menuSessionId === row.id,
                   t,
                   // No row here is pinned, so no row wears the marker and the
                   // time is the row's trailing cell, flush with its edge.
@@ -1988,6 +2046,18 @@ window.__ModuleLoader__.load({
           }
         },
         stopAndArchive: (sessionId) => ctx.uiWorkspace.archiveSession(sessionId, { stopActivity: true }),
+        // The sidebar's own session menu (pin, rename, fork, copy id, Finder, archive).
+        // Opening it here reuses every contribution registered for target "session".
+        openMenu: (sessionId, displayTitle, point) => {
+          ctx.contextMenus.open(
+            {
+              kind: 'session',
+              value: { sessionId, displayTitle },
+            },
+            point,
+          );
+        },
+        hooks: { contextMenuTarget: ctx.contextMenus.active },
       });
 
       ctx.slots.inject('shell.overlay', () =>
