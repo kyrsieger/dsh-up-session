@@ -47,13 +47,15 @@ window.__ModuleLoader__.load({
       unpinNamed: '取消置顶 {title}',
       archive: '归档会话',
       archiveNamed: '归档 {title}',
-      mute: '从最近移出',
-      muteNamed: '从最近移出 {title}',
-      mutedRestore: '恢复移出的会话',
-      mutedRestoreDesc: '把这些会话全部放回「最近」区；与其中任何一条对话后，它也会自动回来。',
-      settingsMuted: '已移出的会话',
-      settingsMutedDesc: '你从「最近」移出、但仍留在各自工作区里的会话。',
-      mutedNone: '没有被移出的会话',
+      mute: '从最近隐藏',
+      muteNamed: '从最近隐藏 {title}',
+      mutedRestore: '恢复',
+      mutedRestoreDesc:
+        '点击「恢复」，可将所有已隐藏的会话重新显示在「最近」区；向某条已隐藏的会话发送新消息后，该会话也会自动重新显示。',
+      settingsMuted: '已隐藏的会话',
+      settingsMutedDesc: '从「最近」隐藏、但仍留在各自工作区里的会话。',
+      mutedNone: '没有被隐藏的会话',
+      mutedCount: '已隐藏 {n} 条会话。',
       openNamed: '打开 {title}',
       openNamedStatus: '打开 {title}（{status}）',
       'hover.ungrouped': '未分组',
@@ -129,14 +131,15 @@ window.__ModuleLoader__.load({
       unpinNamed: 'Unpin {title}',
       archive: 'Archive session',
       archiveNamed: 'Archive {title}',
-      mute: 'Remove from Recent',
-      muteNamed: 'Remove {title} from Recent',
-      mutedRestore: 'Restore removed sessions',
+      mute: 'Hide from Recent',
+      muteNamed: 'Hide {title} from Recent',
+      mutedRestore: 'Restore',
       mutedRestoreDesc:
-        'Put every removed session back into Recent. Talking to one also brings it back automatically.',
-      settingsMuted: 'Removed from Recent',
-      settingsMutedDesc: 'Sessions you removed from Recent; they stay in their workspaces.',
-      mutedNone: 'Nothing has been removed',
+        'Click “Restore” to show all hidden sessions in Recent again. Sending a new message to a hidden session also makes that session reappear automatically.',
+      settingsMuted: 'Hidden sessions',
+      settingsMutedDesc: 'Sessions hidden from Recent; they stay in their workspaces.',
+      mutedNone: 'Nothing has been hidden',
+      mutedCount: 'Hidden sessions: {n}.',
       openNamed: 'Open {title}',
       openNamedStatus: 'Open {title} ({status})',
       'hover.ungrouped': 'Ungrouped',
@@ -474,6 +477,9 @@ window.__ModuleLoader__.load({
       '.dshUS-button:disabled{cursor:not-allowed;opacity:.4}',
       '.dshUS-buttonOutline{border:.5px solid var(--dsw-alias-border-l3)}',
       '.dshUS-buttonOutline:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}',
+      '.dshUS-settingsRestore{flex:none;white-space:nowrap}',
+      '.dshUS-settingsRestore:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
+      'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:1px}',
       '.dshUS-buttonDanger:not(:disabled){color:var(--dsw-alias-state-error-primary)}',
     ].join('');
 
@@ -557,6 +563,29 @@ window.__ModuleLoader__.load({
         },
         h('path', { d: 'M3.5 3.5L12.5 12.5', stroke: 'currentColor' }),
         h('path', { d: 'M12.5 3.5L3.5 12.5', stroke: 'currentColor' }),
+      );
+    }
+
+    /** Eye with a slash for hiding a session from Recent. */
+    function EyeOffGlyph({ size }) {
+      return h(
+        'svg',
+        {
+          width: size,
+          height: size,
+          viewBox: '0 0 16 16',
+          fill: 'none',
+          xmlns: 'http://www.w3.org/2000/svg',
+          'aria-hidden': 'true',
+          stroke: 'currentColor',
+          strokeWidth: 1,
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
+        },
+        h('path', {
+          d: 'M6.3 3.8A6.8 6.8 0 0 1 8 3.6C12 3.6 14.3 8 14.3 8a12.1 12.1 0 0 1-2.1 2.7M10 12a6.4 6.4 0 0 1-2 .4C4 12.4 1.7 8 1.7 8a12 12 0 0 1 2.4-2.9',
+        }),
+        h('path', { d: 'M6.6 6.6a2 2 0 0 0 2.8 2.8M2 2l12 12' }),
       );
     }
 
@@ -2018,7 +2047,7 @@ window.__ModuleLoader__.load({
                       key: 'mute',
                       label: t('muteNamed', { title: row.title }),
                       title: t('mute'),
-                      icon: h(CloseGlyph, { size: 14 }),
+                      icon: h(EyeOffGlyph, { size: 14 }),
                       onClick: () => onMute(row),
                     },
                   ],
@@ -2327,9 +2356,9 @@ window.__ModuleLoader__.load({
                   h(
                     'div',
                     { className: 'dshUS-settingsRowDesc', id: descriptionId + 'muted' },
-                    mutedCount === 0
+                    `${mutedCount === 0
                       ? t('mutedNone')
-                      : `${t('settingsMutedDesc')} ${t('mutedRestoreDesc')}`,
+                      : `${t('settingsMutedDesc')} ${t('mutedRestoreDesc')}`} ${t('mutedCount', { n: mutedCount })}`,
                   ),
                 ),
                 mutedCount === 0
@@ -2338,17 +2367,7 @@ window.__ModuleLoader__.load({
                       'button',
                       {
                         type: 'button',
-                        style: {
-                          flex: 'none',
-                          font: 'inherit',
-                          fontSize: '12px',
-                          padding: '4px 10px',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          border: '1px solid var(--dsw-alias-border-l1)',
-                          background: 'transparent',
-                          color: 'var(--dsw-alias-label-primary)',
-                        },
+                        className: 'dshUS-button dshUS-buttonOutline dshUS-settingsRestore',
                         onClick: onRestoreMuted,
                       },
                       t('mutedRestore'),
