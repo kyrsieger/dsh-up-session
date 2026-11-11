@@ -47,6 +47,13 @@ window.__ModuleLoader__.load({
       unpinNamed: '取消置顶 {title}',
       archive: '归档会话',
       archiveNamed: '归档 {title}',
+      mute: '从最近移出',
+      muteNamed: '从最近移出 {title}',
+      mutedRestore: '恢复移出的会话',
+      mutedRestoreDesc: '把这些会话全部放回「最近」区；与其中任何一条对话后，它也会自动回来。',
+      settingsMuted: '已移出的会话',
+      settingsMutedDesc: '你从「最近」移出、但仍留在各自工作区里的会话。',
+      mutedNone: '没有被移出的会话',
       openNamed: '打开 {title}',
       openNamedStatus: '打开 {title}（{status}）',
       'hover.ungrouped': '未分组',
@@ -122,6 +129,14 @@ window.__ModuleLoader__.load({
       unpinNamed: 'Unpin {title}',
       archive: 'Archive session',
       archiveNamed: 'Archive {title}',
+      mute: 'Remove from Recent',
+      muteNamed: 'Remove {title} from Recent',
+      mutedRestore: 'Restore removed sessions',
+      mutedRestoreDesc:
+        'Put every removed session back into Recent. Talking to one also brings it back automatically.',
+      settingsMuted: 'Removed from Recent',
+      settingsMutedDesc: 'Sessions you removed from Recent; they stay in their workspaces.',
+      mutedNone: 'Nothing has been removed',
       openNamed: 'Open {title}',
       openNamedStatus: 'Open {title} ({status})',
       'hover.ungrouped': 'Ungrouped',
@@ -990,6 +1005,53 @@ window.__ModuleLoader__.load({
     const HOVER_CARD_GAP = 8;
     /** localStorage key holding this plugin's browser-local preferences. */
     const PREFERENCES_KEY = 'dsh-up-session/preferences.v1';
+    /** localStorage key holding the Sessions the user removed from Recent. */
+    const MUTED_KEY = 'dsh-up-session/muted-from-recent.v1';
+
+    /**
+     * The Sessions the user removed from Recent, keyed by Session id. Each value
+     * is the Session's activity stamp at the moment it was removed: the Recent
+     * list skips that Session while its stamp has not advanced, and shows it
+     * again as soon as a new message pushes the stamp forward. A missing,
+     * malformed, or unreadable record means nothing is removed.
+     * @returns Session id to the removal-time activity stamp.
+     */
+    function readMuted() {
+      try {
+        const raw = localStorage.getItem(MUTED_KEY);
+        if (raw === null) return {};
+        const parsed = JSON.parse(raw);
+        if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+        const muted = {};
+        for (const [id, stamp] of Object.entries(parsed)) {
+          if (typeof id === 'string' && id !== '' && typeof stamp === 'number' && Number.isFinite(stamp)) {
+            muted[id] = stamp;
+          }
+        }
+        return muted;
+      } catch (_reason) {
+        return {};
+      }
+    }
+
+    /**
+     * Persist the removal record. An empty record clears the key, and a refused
+     * write only costs the persisted removal, which the caller has already
+     * applied in memory.
+     * @param muted - Session id to the removal-time activity stamp.
+     */
+    function writeMuted(muted) {
+      try {
+        if (Object.keys(muted).length === 0) {
+          localStorage.removeItem(MUTED_KEY);
+          return;
+        }
+        localStorage.setItem(MUTED_KEY, JSON.stringify(muted));
+      } catch (reason) {
+        console.warn('recent removal not saved:', reason);
+      }
+    }
+
 
     /**
      * A page size that can actually drive the list: a whole number inside the
@@ -1160,6 +1222,7 @@ window.__ModuleLoader__.load({
      * @param owners - Session id to the Workspace that accounts for it.
      * @param loaded - whether the Workspace list has loaded at all.
      * @param untitled - the label an untitled Session shows.
+     * @param muted - Session id to the removal-time activity stamp.
      * @returns the rows in display order.
      */
     function recentRows(
@@ -1170,15 +1233,22 @@ window.__ModuleLoader__.load({
       owners,
       loaded,
       untitled,
+      muted,
     ) {
       const archived = new Set(archivedSessionIds);
       const pinned = new Set(pinnedSessionIds);
+      const removed = muted ?? {};
       const rows = [];
       for (const id of sessions.ids) {
         const summary = sessions.byId[id];
         if (summary === undefined) continue;
         if (summary.blank || summary.origin === 'subagent') continue;
         if (archived.has(id) || pinned.has(id)) continue;
+        // A Session the user removed from Recent stays out only while its
+        // activity stamp has not advanced past the removal time. Any new
+        // message pushes the stamp forward, which brings the Session back on
+        // its own, exactly as if it had never been removed.
+        if (removed[id] !== undefined && removed[id] >= toMillis(summary.updatedAt)) continue;
         rows.push(sessionRow(summary, owners.get(id), loaded, untitled, statuses, sessions));
       }
       // Equal stamps break by id, the way the sidebar's own recency order does,
@@ -1248,6 +1318,11 @@ window.__ModuleLoader__.load({
       const [preferences, setPreferences] = React.useState(readPreferences);
       const { expandWorkspaceOnOpen, recentPageSize, showPinned, showRecent } = preferences;
       React.useEffect(() => writePreferences(preferences), [preferences]);
+      // Sessions the user removed from Recent, keyed by id. The stored value is
+      // the activity stamp at removal time and nothing else: no title, no
+      // content, no Workspace change. The record is browser-local.
+      const [muted, setMuted] = React.useState(readMuted);
+      React.useEffect(() => writeMuted(muted), [muted]);
       const changePreference = (key, value) => {
         setPreferences((previous) => {
           const next = { ...previous, [key]: value };
@@ -1375,8 +1450,9 @@ window.__ModuleLoader__.load({
             owners,
             loaded,
             untitled,
+            muted,
           ),
-        [sessions, archivedSessionIds, pinnedSessionIds, statuses, owners, loaded, untitled],
+        [sessions, archivedSessionIds, pinnedSessionIds, statuses, owners, loaded, untitled, muted],
       );
 
       const dialog = h(ArchiveConfirmDialog, {
@@ -1389,6 +1465,8 @@ window.__ModuleLoader__.load({
         settingsOpen &&
         h(SettingsDialog, {
           preferences,
+          mutedCount: Object.keys(muted).length,
+          onRestoreMuted: () => setMuted({}),
           onChangePreference: changePreference,
           onClose: () => setSettingsOpen(false),
           t,
@@ -1465,10 +1543,19 @@ window.__ModuleLoader__.load({
               t,
             })
           : null;
+      // Removing a row from Recent only records its activity stamp: the
+      // Session, its Workspace, its pin and its history are untouched. The
+      // record stops applying the moment new activity advances that stamp, so
+      // the Session walks back into Recent on its own.
+      const muteRow = (row) => {
+        hideHover();
+        setMuted((previous) => ({ ...previous, [row.id]: row.updatedAt }));
+      };
       const shared = {
         currentId,
         onOpen: openRow,
         onArchive: raiseArchive,
+        onMute: muteRow,
         onOpenMenu: openMenu,
         menuSessionId,
         onOpenSettings: () => setSettingsOpen(true),
@@ -1855,6 +1942,7 @@ window.__ModuleLoader__.load({
       onOpen,
       onArchive,
       onPin,
+      onMute,
       onOpenMenu,
       menuSessionId,
       onOpenSettings,
@@ -1925,6 +2013,13 @@ window.__ModuleLoader__.load({
                       title: t('pin'),
                       icon: h(PinGlyph, { size: 14 }),
                       onClick: () => onPin(row),
+                    },
+                    {
+                      key: 'mute',
+                      label: t('muteNamed', { title: row.title }),
+                      title: t('mute'),
+                      icon: h(CloseGlyph, { size: 14 }),
+                      onClick: () => onMute(row),
                     },
                   ],
                 }),
@@ -2108,7 +2203,7 @@ window.__ModuleLoader__.load({
      * @param props - the preference values, their writer, settlement, and the translator.
      * @returns the modal layer.
      */
-    function SettingsDialog({ preferences, onChangePreference, onClose, t }) {
+    function SettingsDialog({ preferences, mutedCount, onRestoreMuted, onChangePreference, onClose, t }) {
       const titleId = React.useId();
       const descriptionId = React.useId();
       const panel = React.useRef(null);
@@ -2222,6 +2317,43 @@ window.__ModuleLoader__.load({
                       ),
                 );
               }),
+              h(
+                'div',
+                { className: 'dshUS-settingsRow', key: 'mutedFromRecent' },
+                h(
+                  'div',
+                  { className: 'dshUS-settingsCopy' },
+                  h('div', { className: 'dshUS-settingsRowTitle' }, t('settingsMuted')),
+                  h(
+                    'div',
+                    { className: 'dshUS-settingsRowDesc', id: descriptionId + 'muted' },
+                    mutedCount === 0
+                      ? t('mutedNone')
+                      : `${t('settingsMutedDesc')} ${t('mutedRestoreDesc')}`,
+                  ),
+                ),
+                mutedCount === 0
+                  ? null
+                  : h(
+                      'button',
+                      {
+                        type: 'button',
+                        style: {
+                          flex: 'none',
+                          font: 'inherit',
+                          fontSize: '12px',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          border: '1px solid var(--dsw-alias-border-l1)',
+                          background: 'transparent',
+                          color: 'var(--dsw-alias-label-primary)',
+                        },
+                        onClick: onRestoreMuted,
+                      },
+                      t('mutedRestore'),
+                    ),
+              ),
             ),
           ),
         ),
