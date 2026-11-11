@@ -25,7 +25,7 @@ window.__ModuleLoader__.load({
       settings: '设置',
       settingsTitle: '设置',
       settingsOpen: '打开设置',
-      settingsEntryDesc: '管理列表显示、最近区展示数量和打开会话时的工作区展开行为。',
+      settingsEntryDesc: '管理列表显示、最近区展示数量与时间过滤，以及打开会话时的工作区展开行为。',
       settingsClose: '关闭设置',
       settingsShowPinned: '显示置顶',
       settingsShowPinnedDesc: '在侧边栏显示置顶会话列表。',
@@ -36,6 +36,9 @@ window.__ModuleLoader__.load({
         '「最近」默认显示最新的多少条会话；「展开更多」每次增加 5 条，「收起」回到这个数量。默认 5 条。',
       settingsPageSizeIncrease: '增加 1',
       settingsPageSizeDecrease: '减少 1',
+      settingsRecentTimeFilter: '最近区时间过滤（天）',
+      settingsRecentTimeFilterDesc:
+        '仅显示最近更新距今未满指定天数的会话。默认 7 天，可填 0–99 的整数；0 表示不过滤。',
       settingsExpandWorkspace: '展开工作区中的原会话',
       settingsExpandWorkspaceDesc:
         '从置顶或最近区打开会话时，同时展开它在工作区列表中的位置。关闭后只打开会话，不改变工作区的展开状态。',
@@ -51,7 +54,7 @@ window.__ModuleLoader__.load({
       muteNamed: '从最近隐藏 {title}',
       mutedRestore: '恢复',
       mutedRestoreDesc:
-        '点击「恢复」，可将所有已隐藏的会话重新显示在「最近」区；向某条已隐藏的会话发送新消息后，该会话也会自动重新显示。',
+        '点击「恢复」解除所有隐藏记录，会话仍须符合时间过滤等收录条件；向已隐藏的会话发送新消息，也会解除该会话的隐藏。',
       settingsMuted: '已隐藏的会话',
       settingsMutedDesc: '从「最近」隐藏、但仍留在各自工作区里的会话。',
       mutedNone: '没有被隐藏的会话。',
@@ -111,7 +114,7 @@ window.__ModuleLoader__.load({
       settingsTitle: 'Settings',
       settingsOpen: 'Open settings',
       settingsEntryDesc:
-        'Manage list visibility, how many sessions Recent shows, and workspace expansion when opening sessions.',
+        'Manage list visibility, the session count and time filter for Recent, and workspace expansion when opening sessions.',
       settingsClose: 'Close settings',
       settingsShowPinned: 'Show Pinned',
       settingsShowPinnedDesc: 'Show the pinned session list in the sidebar.',
@@ -122,6 +125,9 @@ window.__ModuleLoader__.load({
         'How many recent sessions to show by default. “Show more” adds five each time and “Show less” folds the list back to it. Defaults to 5 sessions.',
       settingsPageSizeIncrease: 'Increase by 1',
       settingsPageSizeDecrease: 'Decrease by 1',
+      settingsRecentTimeFilter: 'Recent time filter (days)',
+      settingsRecentTimeFilterDesc:
+        'Only show sessions updated less than this many days ago. Defaults to 7 days. Accepts integers from 0 to 99; 0 disables the filter.',
       settingsExpandWorkspace: 'Reveal the session in its workspace',
       settingsExpandWorkspaceDesc:
         'When you open a session from Pinned or Recent, also expand its workspace in the sidebar. Turn this off to open the session without changing which workspaces are expanded.',
@@ -137,7 +143,7 @@ window.__ModuleLoader__.load({
       muteNamed: 'Hide {title} from Recent',
       mutedRestore: 'Restore',
       mutedRestoreDesc:
-        'Click “Restore” to show all hidden sessions in Recent again. Sending a new message to a hidden session also makes that session reappear automatically.',
+        'Click “Restore” to clear all hidden records; sessions must still meet the time filter and other inclusion rules. Sending a new message also clears that session’s hidden state.',
       settingsMuted: 'Hidden sessions',
       settingsMutedDesc: 'Sessions hidden from Recent; they stay in their workspaces.',
       mutedNone: 'Nothing has been hidden',
@@ -1139,6 +1145,10 @@ window.__ModuleLoader__.load({
     const RECENT_PAGE_MIN = 1;
     const RECENT_PAGE_MAX = 50;
     const RECENT_PAGE_STEP = 5;
+    const RECENT_TIME_DEFAULT = 7;
+    const RECENT_TIME_MIN = 0;
+    const RECENT_TIME_MAX = 99;
+    const DAY_MS = 24 * 60 * 60 * 1000;
     /**
      * Hover-card timing and gap, copied from the host's own Session card: the
      * first card in a list waits 800ms, a neighbouring row then replaces an open
@@ -1211,6 +1221,22 @@ window.__ModuleLoader__.load({
       return Math.min(RECENT_PAGE_MAX, Math.max(RECENT_PAGE_MIN, Math.round(value)));
     }
 
+    /** Time-filter days must be exact integers; invalid values are never rounded. */
+    function isRecentTimeDays(value) {
+      return Number.isInteger(value) && value >= RECENT_TIME_MIN && value <= RECENT_TIME_MAX;
+    }
+
+    /**
+     * Recheck every candidate against the current render time. Row derivation
+     * stays memoized, but passing time alone must not leave a stale cutoff in
+     * that memo when another Session opens or the host publishes an update.
+     * Zero disables only the time condition, leaving all other exclusions intact.
+     */
+    function filterRecentByTime(rows, days, now) {
+      if (days === 0) return rows;
+      return rows.filter((row) => now - row.updatedAt < days * DAY_MS);
+    }
+
     /**
      * The plugin's preferences, read from browser storage. A missing, malformed,
      * or unreadable record falls back to the defaults; in particular the
@@ -1226,6 +1252,7 @@ window.__ModuleLoader__.load({
         showPinned: true,
         showRecent: true,
         recentPageSize: RECENT_PAGE_DEFAULT,
+        recentTimeFilterDays: RECENT_TIME_DEFAULT,
       };
       try {
         const raw = localStorage.getItem(PREFERENCES_KEY);
@@ -1236,6 +1263,8 @@ window.__ModuleLoader__.load({
           const value = parsed?.[key];
           if (key === 'recentPageSize') {
             if (typeof value === 'number') preferences[key] = clampRecentPageSize(value);
+          } else if (key === 'recentTimeFilterDays') {
+            if (isRecentTimeDays(value)) preferences[key] = value;
           } else if (typeof value === 'boolean') {
             preferences[key] = value;
           }
@@ -1461,7 +1490,7 @@ window.__ModuleLoader__.load({
         return () => settingsEvents.removeEventListener('open', openSettings);
       }, [settingsEvents]);
       const [preferences, setPreferences] = React.useState(readPreferences);
-      const { expandWorkspaceOnOpen, recentPageSize, showPinned, showRecent } = preferences;
+      const { expandWorkspaceOnOpen, recentPageSize, recentTimeFilterDays, showPinned, showRecent } = preferences;
       React.useEffect(() => writePreferences(preferences), [preferences]);
       // Sessions the user removed from Recent, keyed by id. The stored value is
       // the activity stamp at removal time and nothing else: no title, no
@@ -1585,7 +1614,7 @@ window.__ModuleLoader__.load({
           ),
         [pinnedSessionIds, archivedSessionIds, sessions, statuses, owners, loaded, untitled],
       );
-      const recent = React.useMemo(
+      const recentCandidates = React.useMemo(
         () =>
           recentRows(
             sessions,
@@ -1599,6 +1628,9 @@ window.__ModuleLoader__.load({
           ),
         [sessions, archivedSessionIds, pinnedSessionIds, statuses, owners, loaded, untitled, muted],
       );
+      // Use the same host subscriptions as the native sidebar. No clock,
+      // focus, or visibility listener: any existing render rechecks all rows.
+      const recent = filterRecentByTime(recentCandidates, recentTimeFilterDays, Date.now());
 
       const dialog = h(ArchiveConfirmDialog, {
         request: archiveRequest,
@@ -2254,22 +2286,26 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The Recent page-size field: the number, plus one chevron per direction.
+     * A numeric preference field, plus one chevron per direction.
      * Typing only moves the draft, so nothing is applied mid-edit; the value is
      * confirmed when the field is left, Enter is pressed, or a chevron is
-     * clicked. Confirming writes the clamped number and drops a draft that is
-     * not a number at all. The draft follows the stored value when the
-     * preference changes elsewhere.
-     * @param props - the stored size, its writer, the field and button labels, and the id of its description.
+     * clicked. Page sizes are clamped; strict day counts reject invalid drafts
+     * instead. Text input keeps invalid pasted day counts intact until they
+     * are rejected, rather than silently converting decimals or exponents.
+     * The draft follows the stored value when the preference changes elsewhere.
+     * @param props - the stored value, bounds, validation mode, writer, and labels.
      * @returns the field and its stepper.
      */
-    function RecentPageSizeInput({
+    function PreferenceNumberInput({
       value,
       onChange,
       label,
       descriptionId,
       increaseLabel,
       decreaseLabel,
+      min = RECENT_PAGE_MIN,
+      max = RECENT_PAGE_MAX,
+      strictDays = false,
     }) {
       const [draft, setDraft] = React.useState(String(value));
       React.useEffect(() => {
@@ -2278,7 +2314,9 @@ window.__ModuleLoader__.load({
       // What the field itself considers its number: a usable draft, clamped, or
       // the stored value while the draft says nothing readable.
       const parsed = draft.trim() === '' ? Number.NaN : Number(draft);
-      const current = Number.isFinite(parsed) ? clampRecentPageSize(parsed) : value;
+      const current = strictDays
+        ? (/^\d{1,2}$/.test(draft) && isRecentTimeDays(parsed) ? parsed : value)
+        : (Number.isFinite(parsed) ? clampRecentPageSize(parsed) : value);
       const settle = () => {
         setDraft(String(current));
         if (current !== value) onChange(current);
@@ -2286,7 +2324,7 @@ window.__ModuleLoader__.load({
       // A click on a chevron is a confirmation of its own, so it applies its
       // step immediately instead of waiting for the field to be left.
       const step = (delta) => {
-        const next = clampRecentPageSize(current + delta);
+        const next = Math.min(max, Math.max(min, current + delta));
         setDraft(String(next));
         if (next !== value) onChange(next);
       };
@@ -2295,11 +2333,12 @@ window.__ModuleLoader__.load({
         { className: 'dshUS-numberField' },
         h('input', {
           className: 'dshUS-number',
-          type: 'number',
+          type: strictDays ? 'text' : 'number',
           inputMode: 'numeric',
-          min: RECENT_PAGE_MIN,
-          max: RECENT_PAGE_MAX,
-          step: 1,
+          pattern: strictDays ? '[0-9]{1,2}' : undefined,
+          min: strictDays ? undefined : min,
+          max: strictDays ? undefined : max,
+          step: strictDays ? undefined : 1,
           value: draft,
           'aria-label': label,
           'aria-describedby': descriptionId,
@@ -2323,7 +2362,7 @@ window.__ModuleLoader__.load({
               className: 'dshUS-step',
               'aria-label': increaseLabel,
               title: increaseLabel,
-              disabled: current >= RECENT_PAGE_MAX,
+              disabled: current >= max,
               onClick: () => step(1),
             },
             h(StepGlyph, { direction: 'up' }),
@@ -2335,7 +2374,7 @@ window.__ModuleLoader__.load({
               className: 'dshUS-step',
               'aria-label': decreaseLabel,
               title: decreaseLabel,
-              disabled: current <= RECENT_PAGE_MIN,
+              disabled: current <= min,
               onClick: () => step(-1),
             },
             h(StepGlyph, { direction: 'down' }),
@@ -2367,6 +2406,9 @@ window.__ModuleLoader__.load({
           description: 'settingsExpandWorkspaceDesc' },
         { key: 'recentPageSize', control: 'number', label: 'settingsRecentPageSize',
           description: 'settingsRecentPageSizeDesc' },
+        { key: 'recentTimeFilterDays', control: 'number', label: 'settingsRecentTimeFilter',
+          description: 'settingsRecentTimeFilterDesc', min: RECENT_TIME_MIN,
+          max: RECENT_TIME_MAX, strictDays: true },
       ];
       // Focus moves into the panel on open (the host's Modal does the same), and
       // the effect puts it back on the section's settings entry on close. That
@@ -2447,7 +2489,10 @@ window.__ModuleLoader__.load({
                       t(setting.description)),
                   ),
                   setting.control === 'number'
-                    ? h(RecentPageSizeInput, {
+                    ? h(PreferenceNumberInput, {
+                        min: setting.min,
+                        max: setting.max,
+                        strictDays: setting.strictDays,
                         value: preferences[setting.key],
                         onChange: (value) => onChangePreference(setting.key, value),
                         label: t(setting.label),

@@ -65,6 +65,10 @@ Sits between the pinned section and the workspace rows, lists the sessions that 
 
 Hovering a row reveals its archive, pin and **Hide from Recent** buttons. The context menu is the same as in the pinned section. Pinned sessions appear only in the pinned section, so no conversation is listed twice.
 
+By default, Recent only includes sessions updated less than seven days ago. Settings accepts 0–99 days; 0 disables the filter. A day is a continuous 24 hours, and a session is excluded as soon as it reaches the configured age, including running sessions, sessions waiting for a response, and the currently open session. Filtering only affects Recent; sessions remain in their original workspaces. "Show more" only reveals sessions that meet the filter.
+
+The time filter follows the native session updates: for example, switching sessions updates the list and rechecks every idle session too. With no relevant page updates, a newly expired session may remain until the next update. The plugin adds no timer or page focus listener for filtering.
+
 ## Hide from Recent
 
 Every recent row ends with a **Hide from Recent** button, shown with a slashed-eye icon on hover to the right of archive and pin. Clicking it hides the session from Recent only: it stays in its workspace with its position, title, history, pin and archive state untouched.
@@ -85,14 +89,15 @@ Each section header carries a gear at its right edge, shown while the pointer is
 
 You can also open the same settings popup from the sidebar via **Plugins → Installed plugins → dsh-up-session**, then click **Open settings** on the plugin detail page.
 
-There are four settings:
+There are five settings:
 
 - **Show Pinned** (on by default): show or hide the entire Pinned section.
 - **Show Recent** (on by default): show or hide the entire Recent section. Both lists can be turned off together and enabled again through **Open settings** on the native plugin detail page.
 - **Reveal the session in its workspace** (on by default): opening a session from Pinned or Recent also expands its workspace group in the sidebar so the original row is visible. Turn it off to open the session without changing which groups are expanded.
 - **Sessions shown in Recent** (five by default): how many recent sessions Recent shows at rest. Accepts 1–50; a value outside that range snaps to the nearest bound. Typing applies on Enter or when the field loses focus, and the arrow buttons beside the field step by one. "Show more" always adds five, regardless of this count.
+- **Recent time filter (days)** (7 by default): accepts only integers from 0 to 99; 0 disables the filter. Applies on Enter, blur, or an arrow-button click. Invalid input reverts to the previous valid value without rounding or clamping. The setting is stored locally in the browser; existing users also start with seven days.
 
-The popup also carries a **Hidden sessions** row: it states how many sessions are currently hidden and offers one button to put them all back. With nothing hidden, the row shows no button.
+The popup also carries a **Hidden sessions** row: it states how many sessions are currently hidden and offers one button to clear all hidden records. Restored sessions must still meet the time filter and other inclusion rules. With nothing hidden, the row shows no button.
 
 ## License
 
