@@ -59,6 +59,7 @@ window.__ModuleLoader__.load({
       openNamed: '打开 {title}',
       revealOriginal: '在原位置显示',
       openNamedStatus: '打开 {title}（{status}）',
+      'hover.workspaceNotFound': '未找到工作区',
       'hover.ungrouped': '未分组',
       'status.running': '进行中',
       'status.completed': '已完成',
@@ -144,6 +145,7 @@ window.__ModuleLoader__.load({
       openNamed: 'Open {title}',
       revealOriginal: 'Show in original location',
       openNamedStatus: 'Open {title} ({status})',
+      'hover.workspaceNotFound': 'Workspace not found',
       'hover.ungrouped': 'Ungrouped',
       'status.running': 'Running',
       'status.completed': 'Completed',
@@ -301,7 +303,8 @@ window.__ModuleLoader__.load({
       // The one field these sections add to the host card: the Workspace that
       // owns the Session, named by its (renamable) title rather than its folder.
       // It carries no label; the bare title reads as the Session's context.
-      '.dshUS-hoverWorkspace{color:#cfd3d6;overflow-wrap:anywhere;font-size:12px;line-height:16px}',
+      '.dshUS-hoverWorkspace{color:#cfd3d6;overflow-wrap:anywhere;font-size:12px;line-height:16px;min-height:16px}',
+      '.dshUS-hoverWorkspaceMissing{color:#a1a5a9}',
       '.dshUS-hoverPath{color:#cfd3d6;word-break:break-all;font-size:12px;line-height:16px}',
       '.dshUS-hoverTime{color:#cfd3d6;font-size:12px;line-height:16px}',
       '.dshUS-hoverStatus{display:flex;align-items:center;gap:8px;color:#adb2b8;',
@@ -1957,14 +1960,14 @@ window.__ModuleLoader__.load({
       }, [card.left, card.top, row.id]);
       const now = Date.now();
       const time = hoverTime(row.updatedAt, now, t);
-      // An unknown owner (the Workspace list has not loaded) omits the field; a
-      // loaded list with no owner means the Session sits in "Ungrouped".
-      const workspace =
-        row.workspaceId === undefined
-          ? undefined
-          : row.workspace === ''
-            ? t('hover.ungrouped')
-            : row.workspace;
+      // Distinguish an unknown owner from the host's ungrouped bucket (empty id).
+      // A registered workspace keeps its own name, even when that name is empty.
+      const workspaceMissing = row.workspaceId === undefined;
+      const workspace = workspaceMissing
+        ? t('hover.workspaceNotFound')
+        : row.workspaceId === ''
+          ? t('hover.ungrouped')
+          : row.workspace;
       return createPortal(
         h(
           'div',
@@ -1977,8 +1980,11 @@ window.__ModuleLoader__.load({
             onPointerLeave: onLeave,
           },
           h('div', { className: 'dshUS-hoverTitle' }, row.title),
-          workspace !== undefined &&
-            h('div', { className: 'dshUS-hoverWorkspace' }, workspace),
+          h('div', {
+            className: workspaceMissing
+              ? 'dshUS-hoverWorkspace dshUS-hoverWorkspaceMissing'
+              : 'dshUS-hoverWorkspace',
+          }, workspace),
           row.cwd !== undefined && h('div', { className: 'dshUS-hoverPath' }, row.cwd),
           time !== '' && h('div', { className: 'dshUS-hoverTime' }, time),
           row.hoverStatuses.map((status) =>
