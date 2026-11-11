@@ -63,7 +63,15 @@ Sits between the pinned section and the workspace rows, lists the sessions that 
 - once every session is on screen the button reads "Show less",
 - clicking "Show less" folds the list back to the configured count.
 
-Hovering a row reveals its archive and pin buttons. The context menu is the same as in the pinned section. Pinned sessions appear only in the pinned section, so no conversation is listed twice.
+Hovering a row reveals its archive, pin and **Hide from Recent** buttons. The context menu is the same as in the pinned section. Pinned sessions appear only in the pinned section, so no conversation is listed twice.
+
+## Hide from Recent
+
+Every recent row ends with a **Hide from Recent** button, shown with a slashed-eye icon on hover to the right of archive and pin. Clicking it hides the session from Recent only: it stays in its workspace with its position, title, history, pin and archive state untouched.
+
+The plugin remembers just one thing about that moment, the session's activity stamp. Open the session from its workspace and send a new message and the stamp moves forward, which puts the session back into Recent on its own, with nothing else to click.
+
+The record lives in browser storage and holds only the session id and that stamp — no titles, no content. It stops applying after a browser change or a cache clear, which is also the sign that no session data was touched. A mistaken click is reversible from Settings with one button.
 
 ## Session hover card
 
@@ -83,6 +91,8 @@ There are four settings:
 - **Show Recent** (on by default): show or hide the entire Recent section. Both lists can be turned off together and enabled again through **Open settings** on the native plugin detail page.
 - **Reveal the session in its workspace** (on by default): opening a session from Pinned or Recent also expands its workspace group in the sidebar so the original row is visible. Turn it off to open the session without changing which groups are expanded.
 - **Sessions shown in Recent** (five by default): how many recent sessions Recent shows at rest. Accepts 1–50; a value outside that range snaps to the nearest bound. Typing applies on Enter or when the field loses focus, and the arrow buttons beside the field step by one. "Show more" always adds five, regardless of this count.
+
+The popup also carries a **Hidden sessions** row: it states how many sessions are currently hidden and offers one button to put them all back. With nothing hidden, the row shows no button.
 
 ## License
 
