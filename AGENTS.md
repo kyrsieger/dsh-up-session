@@ -14,3 +14,7 @@
 ## 兼容版本
 
 修改 `package.json` 中的 `engines.dsh` 兼容版本时，必须同步修改中文 README「安装与兼容」和英文 README「Installation and compatibility」章节第一行的版本号，保持一致。
+
+## CHANGELOG 和 Release 草稿
+
+生成 CHANGELOG 和 Release 草稿时，如果某项功能或修复来自 GitHub PR，或解决了 GitHub issue，必须在对应条目中附上相关 PR 或 issue 的链接；两者都有时应同时附上。
