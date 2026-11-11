@@ -54,7 +54,7 @@ window.__ModuleLoader__.load({
         '点击「恢复」，可将所有已隐藏的会话重新显示在「最近」区；向某条已隐藏的会话发送新消息后，该会话也会自动重新显示。',
       settingsMuted: '已隐藏的会话',
       settingsMutedDesc: '从「最近」隐藏、但仍留在各自工作区里的会话。',
-      mutedNone: '没有被隐藏的会话',
+      mutedNone: '没有被隐藏的会话。',
       mutedCount: '已隐藏 {n} 条会话。',
       openNamed: '打开 {title}',
       revealOriginal: '在原位置显示',
@@ -2474,9 +2474,9 @@ window.__ModuleLoader__.load({
                   h(
                     'div',
                     { className: 'dshUS-settingsRowDesc', id: descriptionId + 'muted' },
-                    `${mutedCount === 0
+                    mutedCount === 0
                       ? t('mutedNone')
-                      : `${t('settingsMutedDesc')} ${t('mutedRestoreDesc')}`} ${t('mutedCount', { n: mutedCount })}`,
+                      : `${t('settingsMutedDesc')} ${t('mutedRestoreDesc')} ${t('mutedCount', { n: mutedCount })}`,
                   ),
                 ),
                 mutedCount === 0
