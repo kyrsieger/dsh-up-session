@@ -33,7 +33,7 @@ window.__ModuleLoader__.load({
       settingsShowRecentDesc: '在侧边栏显示最近会话列表。',
       settingsRecentPageSize: '最近区默认展示的会话数',
       settingsRecentPageSizeDesc:
-        '「最近」默认显示最新的多少条会话；「展开更多」每次增加 5 条，「收起」回到这个数量。可填 1–50，默认 5。',
+        '「最近」默认显示最新的多少条会话；「展开更多」每次增加 5 条，「收起」回到这个数量。默认 5 条。',
       settingsPageSizeIncrease: '增加 1',
       settingsPageSizeDecrease: '减少 1',
       settingsExpandWorkspace: '展开工作区中的原会话',
@@ -118,7 +118,7 @@ window.__ModuleLoader__.load({
       settingsShowRecentDesc: 'Show the recent session list in the sidebar.',
       settingsRecentPageSize: 'Sessions shown in Recent',
       settingsRecentPageSizeDesc:
-        'How many recent sessions to show by default. “Show more” adds five each time and “Show less” folds the list back to it; accepts 1–50, five by default.',
+        'How many recent sessions to show by default. “Show more” adds five each time and “Show less” folds the list back to it. Defaults to 5 sessions.',
       settingsPageSizeIncrease: 'Increase by 1',
       settingsPageSizeDecrease: 'Decrease by 1',
       settingsExpandWorkspace: 'Reveal the session in its workspace',
@@ -419,28 +419,31 @@ window.__ModuleLoader__.load({
       'background:var(--dsw-alias-switch-thumb)}',
       '.dshUS-switch[aria-checked="true"] .dshUS-switchThumb{transform:translate(16px)}',
       '@media (prefers-reduced-motion:reduce){.dshUS-switchThumb{transition:none}}',
-      // The Recent count field, styled as the host's own compact input: the
-      // same hairline border, radius, and focus ring as the buttons, with the
-      // native spinner hidden so the number reads as one value. The chevrons
-      // beside it are the visible way to step; they are plain ghost buttons so
-      // the pair stays quiet next to the switches.
-      '.dshUS-numberField{display:flex;align-items:center;gap:6px;flex:none}',
-      '.dshUS-number{box-sizing:border-box;flex:none;width:72px;height:32px;padding:0 10px;',
-      'border:.5px solid var(--dsw-alias-border-l3);border-radius:var(--dsw-radius-md,8px);',
+      // Match the host's font-size stepper: a module surface with compact
+      // arrows inside its right edge, revealed on hover or keyboard focus.
+      // Center the value across the full field, independently of the arrows.
+      '.dshUS-numberField{position:relative;display:inline-flex;align-items:center;flex:none;',
+      'width:72px;height:36px;border-radius:var(--dsw-radius-md,8px);',
+      'background:var(--dsw-alias-bg-module-platform)}',
+      '.dshUS-number{box-sizing:border-box;min-width:0;width:100%;height:100%;padding:0 8px;',
+      'border:0;border-radius:inherit;outline:none;',
       'background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:14px;',
-      'line-height:22px;text-align:center;-moz-appearance:textfield;appearance:textfield}',
-      '.dshUS-number:hover{background:var(--dsw-alias-interactive-bg-hover)}',
-      '.dshUS-number:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
+      'line-height:22px;text-align:center;font-variant-numeric:tabular-nums;',
+      '-moz-appearance:textfield;appearance:textfield}',
+      '.dshUS-numberField:focus-within{outline:var(--dsw-focus-ring-width,2px) solid ',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:1px}',
       '.dshUS-number::-webkit-outer-spin-button,',
       '.dshUS-number::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}',
-      '.dshUS-stepper{display:flex;flex-direction:column;gap:1px}',
+      '.dshUS-stepper{position:absolute;right:8px;display:flex;flex-direction:column;gap:2px;opacity:0}',
+      '@media (hover:hover){.dshUS-numberField:hover .dshUS-stepper{opacity:1}}',
+      '.dshUS-numberField:focus-within .dshUS-stepper{opacity:1}',
+      '@media (hover:none){.dshUS-stepper{opacity:1}}',
       '.dshUS-step{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;',
-      'width:22px;height:15px;padding:0;border:0;border-radius:var(--dsw-radius-sm,4px);',
-      'background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer}',
-      '.dshUS-step:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);',
-      'color:var(--dsw-alias-label-primary)}',
-      '.dshUS-step:disabled{cursor:not-allowed;opacity:.35}',
+      'width:17px;height:12px;padding:0;border:0;border-radius:var(--dsw-radius-xs,4px);',
+      'background:color-mix(in srgb,var(--dsw-alias-bg-layer-1) 75%,transparent);',
+      'color:var(--dsw-alias-label-primary);cursor:pointer}',
+      '@media (hover:hover){.dshUS-step:hover:not(:disabled){background:var(--dsw-alias-bg-layer-1)}}',
+      '.dshUS-step:disabled{color:var(--dsw-alias-label-caption);cursor:default}',
       '.dshUS-step:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:0}',
       '.dshUS-stepGlyphUp{transform:rotate(180deg)}',
@@ -2219,7 +2222,7 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * One stepper chevron: a small V pointing up or down beside the count field,
+     * One stepper chevron: a small V pointing up or down inside the count field,
      * drawn at the size of the host's compact controls.
      * @param props - the direction the chevron points.
      * @returns the chevron SVG.
@@ -2228,8 +2231,8 @@ window.__ModuleLoader__.load({
       return h(
         'svg',
         {
-          width: 12,
-          height: 12,
+          width: 9,
+          height: 9,
           viewBox: '0 0 16 16',
           fill: 'none',
           xmlns: 'http://www.w3.org/2000/svg',
