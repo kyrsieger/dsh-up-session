@@ -57,6 +57,7 @@ window.__ModuleLoader__.load({
       mutedNone: '没有被隐藏的会话',
       mutedCount: '已隐藏 {n} 条会话。',
       openNamed: '打开 {title}',
+      revealOriginal: '在原位置显示',
       openNamedStatus: '打开 {title}（{status}）',
       'hover.ungrouped': '未分组',
       'status.running': '进行中',
@@ -141,6 +142,7 @@ window.__ModuleLoader__.load({
       mutedNone: 'Nothing has been hidden',
       mutedCount: 'Hidden sessions: {n}.',
       openNamed: 'Open {title}',
+      revealOriginal: 'Show in original location',
       openNamedStatus: 'Open {title} ({status})',
       'hover.ungrouped': 'Ungrouped',
       'status.running': 'Running',
@@ -180,6 +182,14 @@ window.__ModuleLoader__.load({
 
     /** Stylesheet, scoped to this plugin's own class names. */
     const CSS = [
+      // An inset shadow tints the background below the row's content without
+      // replacing the host's selected/hover background or changing its layout.
+      // Resolve the theme token in CSS, so theme changes also affect an active pulse.
+      // Fade in for 0.6s, hold peak intensity for 1.2s, then fade out for 1.2s.
+      '[data-dsh-up-session-reveal]{animation:dshUS-revealOriginal 3s ease-in-out}',
+      '@keyframes dshUS-revealOriginal{',
+      '0%,100%{box-shadow:inset 0 0 0 100vmax color-mix(in srgb,var(--dsw-alias-brand-primary) 0%,transparent)}',
+      '20%,60%{box-shadow:inset 0 0 0 100vmax color-mix(in srgb,var(--dsw-alias-brand-primary) 20%,transparent)}}',
       // Right edge is measured at runtime from a native session row (see
       // alignToNativeRows): arithmetic on the host's padding chain got this wrong
       // twice, so the section copies the real geometry instead of predicting it.
@@ -566,6 +576,27 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /** Target with four ticks for revealing a session's original location. */
+    function RevealOriginalGlyph() {
+      return h(
+        'svg',
+        {
+          width: 14,
+          height: 14,
+          viewBox: '0 0 16 16',
+          fill: 'none',
+          xmlns: 'http://www.w3.org/2000/svg',
+          'aria-hidden': 'true',
+          stroke: 'currentColor',
+          strokeWidth: 1,
+          strokeLinecap: 'round',
+        },
+        h('circle', { cx: 8, cy: 8, r: 4.5 }),
+        h('circle', { cx: 8, cy: 8, r: 1.5 }),
+        h('path', { d: 'M8 1v3M8 12v3M1 8h3M12 8h3' }),
+      );
+    }
+
     /** Eye with a slash for hiding a session from Recent. */
     function EyeOffGlyph({ size }) {
       return h(
@@ -867,9 +898,12 @@ window.__ModuleLoader__.load({
       return chain;
     }
 
+    /** Pending group expansions, including those started by normal row opens. */
+    const pendingWorkspaceExpansions = new Set();
+
     /**
-     * Expand every collapsed Workspace group on the way to one Workspace, then
-     * open the Session. A plugin has no service handle on the sidebar's
+     * Expand every collapsed Workspace group on the way to one Workspace.
+     * A plugin has no service handle on the sidebar's
      * expansion state, so the plugin drives the host's own group toggle: a
      * group row's click handler is the one the sidebar's header uses, and it
      * both opens the group and saves that choice exactly as a user's click
@@ -880,18 +914,19 @@ window.__ModuleLoader__.load({
      * highlight: that stays the sidebar's own `mainView` rendering.
      * @param workspaces - the sidebar's Workspace items, in list order.
      * @param workspaceId - the Workspace that owns the Session being opened.
+     * @returns cancellation of any remaining expansion retries.
      */
     function expandWorkspacePath(workspaces, workspaceId) {
       // No known owner means the Workspace list has not been applied yet; the
       // "Ungrouped" bucket would be a guess, so leave the tree alone.
-      if (workspaceId === undefined) return;
+      if (workspaceId === undefined) return () => {};
       const chain = workspaceChain(workspaces, workspaceId);
-      if (chain.length === 0) return;
+      if (chain.length === 0) return () => {};
       // Ids are opaque Host values, so rows are matched through `dataset` rather
       // than through a selector assembled from one. No group row at all means
       // the list is not showing a grouped tree (a folded sidebar, the flat
       // "Last updated" view, or search results), so there is nothing to unfold.
-      if (workspaceRows().length === 0) return;
+      if (workspaceRows().length === 0) return () => {};
       // A folded ancestor renders no child rows, so the walk runs outermost
       // first. React commits a discrete click before `dispatchEvent` returns,
       // which makes the children's rows visible to the next lookup; should a
@@ -899,7 +934,17 @@ window.__ModuleLoader__.load({
       // key is clicked at most once so a repeat never folds a group it opened.
       let remaining = chain.length + 1;
       const opened = new Set();
+      let frame = 0;
+      let cancelled = false;
+      const cancel = () => {
+        cancelled = true;
+        cancelAnimationFrame(frame);
+        pendingWorkspaceExpansions.delete(cancel);
+      };
+      pendingWorkspaceExpansions.add(cancel);
       const pass = () => {
+        frame = 0;
+        if (cancelled) return;
         for (const [index, key] of chain.entries()) {
           if (opened.has(key)) continue;
           const row = findWorkspaceRow(key);
@@ -914,11 +959,15 @@ window.__ModuleLoader__.load({
         const target = chain[chain.length - 1];
         const targetRow = findWorkspaceRow(target);
         const done = targetRow !== undefined && targetRow.getAttribute('aria-expanded') !== 'false';
-        if (done || remaining <= 0) return;
+        if (done || remaining <= 0) {
+          pendingWorkspaceExpansions.delete(cancel);
+          return;
+        }
         remaining -= 1;
-        requestAnimationFrame(pass);
+        frame = requestAnimationFrame(pass);
       };
       pass();
+      return cancel;
     }
 
     /** The data-row-key value of one Workspace group row. */
@@ -946,6 +995,67 @@ window.__ModuleLoader__.load({
         }
       }
       return undefined;
+    }
+
+    /** Only the latest explicit reveal may move the workspace list. */
+    let revealFrame = 0;
+    let cancelRevealExpansion = () => {};
+    /** Remove the previous pulse and its listeners, including on plugin unload. */
+    let clearRevealHighlight = () => {};
+
+    /** Pulse the native row's background once, restarting on repeated reveals. */
+    function highlightOriginalSession(row) {
+      clearRevealHighlight();
+      const cleanup = () => {
+        delete row.dataset.dshUpSessionReveal;
+        row.removeEventListener('animationend', onEnd);
+        clearRevealHighlight = () => {};
+      };
+      const onEnd = (event) => {
+        if (event.target === row && event.animationName === 'dshUS-revealOriginal') cleanup();
+      };
+      // Commit the attribute removal before adding it again, so repeating the menu
+      // action on the same row starts a fresh three-second animation.
+      void row.offsetWidth;
+      row.addEventListener('animationend', onEnd);
+      // React owns the host row's className, but leaves our data attribute alone.
+      row.dataset.dshUpSessionReveal = '';
+      clearRevealHighlight = cleanup;
+    }
+
+    /** Expand the owning groups and any session overflow, then scroll to the native row. */
+    function revealOriginalSession(workspaces, sessionId, workspaceId, sessionCount) {
+      cancelAnimationFrame(revealFrame);
+      cancelRevealExpansion();
+      cancelRevealExpansion = expandWorkspacePath(workspaces, workspaceId);
+      // Group toggles and overflow buttons may commit on the next frame. Bound
+      // retries by the list size, including sessions beyond the host's watermark.
+      let remaining = sessionCount + workspaces.length + 10;
+      const pass = () => {
+        revealFrame = 0;
+        const rows = document.querySelectorAll('[data-slot="sidebar.workspaces"] [data-row-key]');
+        for (const row of rows) {
+          if (row instanceof HTMLElement && row.dataset.rowKey === `session:${sessionId}`) {
+            row.scrollIntoView({ block: 'center', inline: 'nearest' });
+            highlightOriginalSession(row);
+            return;
+          }
+        }
+        // The host renders only the first batch of sessions in a workspace.
+        // Use its own button so the expanded count follows the host's rules.
+        for (const row of rows) {
+          if (
+            row instanceof HTMLElement &&
+            row.dataset.rowKey === `overflow:${workspaceId}` &&
+            row.getAttribute('aria-expanded') === 'false'
+          ) {
+            row.click();
+            break;
+          }
+        }
+        if (--remaining > 0) revealFrame = requestAnimationFrame(pass);
+      };
+      revealFrame = requestAnimationFrame(pass);
     }
 
     /**
@@ -1585,7 +1695,12 @@ window.__ModuleLoader__.load({
         onOpen: openRow,
         onArchive: raiseArchive,
         onMute: muteRow,
-        onOpenMenu: openMenu,
+        onOpenMenu: (sessionId, displayTitle, point) => {
+          const workspaceId = owners.get(sessionId)?.workspaceId ?? (loaded ? '' : undefined);
+          openMenu(sessionId, displayTitle, point, () =>
+            revealOriginalSession(workspaces, sessionId, workspaceId, Object.keys(sessions.byId).length),
+          );
+        },
         menuSessionId,
         onOpenSettings: () => setSettingsOpen(true),
         settingsOpen,
@@ -2688,6 +2803,32 @@ window.__ModuleLoader__.load({
       // Both entry surfaces send requests to the single sidebar-owned dialog.
       const settingsEvents = new EventTarget();
 
+      ctx.slots.inject('contextMenu.icon', () => ctx.slots.register({
+        name: 'contextMenu.icon',
+        key: 'up-session.reveal-original',
+      }, RevealOriginalGlyph));
+
+      // Only menus opened from our sections carry this callback. Native rows
+      // continue to use the host's menu without the extra action.
+      ctx.effect(() => ctx.contextMenus.register({
+        id: 'up-session.reveal-original',
+        target: 'session',
+        order: 550, // After the host's file-manager action (500), before archive (600).
+        observe: () => [ctx.locale],
+        resolve: (target) => typeof target.revealOriginal === 'function' ? [{
+          id: 'reveal-original',
+          label: t('revealOriginal'),
+          icon: { key: 'up-session.reveal-original' },
+          run: target.revealOriginal,
+        }] : [],
+      }), 'up-session: reveal original menu action');
+      ctx.effect(() => () => {
+        cancelAnimationFrame(revealFrame);
+        for (const cancel of pendingWorkspaceExpansions) cancel();
+        cancelRevealExpansion = () => {};
+        clearRevealHighlight();
+      }, 'up-session: cancel pending reveal');
+
       ctx.slots.inject('plugins.bundle.config', () =>
         ctx.slots.register(
           {
@@ -2738,11 +2879,11 @@ window.__ModuleLoader__.load({
         stopAndArchive: (sessionId) => ctx.uiWorkspace.archiveSession(sessionId, { stopActivity: true }),
         // The sidebar's own session menu (pin, rename, fork, copy id, Finder, archive).
         // Opening it here reuses every contribution registered for target "session".
-        openMenu: (sessionId, displayTitle, point) => {
+        openMenu: (sessionId, displayTitle, point, revealOriginal) => {
           ctx.contextMenus.open(
             {
               kind: 'session',
-              value: { sessionId, displayTitle },
+              value: { sessionId, displayTitle, revealOriginal },
             },
             point,
           );
