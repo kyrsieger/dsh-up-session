@@ -2756,7 +2756,7 @@ window.__ModuleLoader__.load({
 
     /**
      * The scroll box holding the workspace list. In the grouped and flat views
-     * the `role="tree"` box scrolls itself; while searching, the results tree
+     * older hosts' `role="tree"` box scrolls itself; while searching, the results tree
      * sits one level inside that same box, so the nearest scrolling ancestor is
      * the seat either way. The sections live at the top of this box, inside the
      * "Workspaces" section, and scroll away with the workspace rows instead of
@@ -2767,6 +2767,12 @@ window.__ModuleLoader__.load({
     function workspaceScrollBox(anchor) {
       const tree = anchor.querySelector('[role="tree"]');
       if (!(tree instanceof Element)) return null;
+      // Since rc.2 the host marks the list area explicitly and switches its
+      // overflow-y from auto to hidden via a scroll-state container query.
+      // Its identity must not depend on that style: removing our sections can
+      // restore auto, causing the mutation observer to insert/remove forever.
+      const listArea = tree.closest('[data-sidebar-list-area]');
+      if (listArea instanceof Element && anchor.contains(listArea)) return listArea;
       for (let node = tree; node !== null && node !== anchor; node = node.parentElement) {
         const { overflowY } = getComputedStyle(node);
         if (overflowY === 'auto' || overflowY === 'scroll') return node;
