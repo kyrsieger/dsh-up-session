@@ -1,6 +1,6 @@
 {
   "name": "dsh-up-session",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "type": "module",
   "description": "Adds pinned and recent session groups at the top of the workspace list in the DSH sidebar. Rows open the host session menu, and each group header has a settings popup.",
   "license": "MIT",
