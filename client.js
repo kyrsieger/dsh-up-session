@@ -3,6 +3,7 @@ window.__ModuleLoader__.load({
   factory(require) {
     const React = require('react');
     const { createPortal } = require('react-dom');
+    const { IconTriangleRightFillRegular } = require('@deepseek-ai/dsh-client-ui-primitives');
     const h = React.createElement;
 
     /** Dictionary namespace owned by this plugin. */
@@ -208,10 +209,10 @@ window.__ModuleLoader__.load({
       '.dshUS-mount[data-rail="true"],.dshUS-mount[data-searching="true"]{display:none}',
       '.dshUS-root{box-sizing:border-box;display:flex;flex-direction:column;gap:2px;',
       '--dshUS-status-width:16px}',
-      // The header copies the host's "Workspaces" section header: same box, same
-      // 14px/20px label, same tertiary label colour. The whole row is the toggle,
-      // and the settings entry floats over its right edge without taking space,
-      // so revealing it on hover never shifts the label or the chevron.
+      // The header follows a native workspace row's hover background and icon
+      // swap. The whole row is the toggle. The settings entry floats over its
+      // right edge without taking space,
+      // so revealing it on hover never shifts the label or the icon.
       '.dshUS-headerRow{box-sizing:border-box;position:relative;display:flex;align-items:center;',
       'height:36px;margin:0 0 4px}',
       '.dshUS-header{box-sizing:border-box;display:flex;align-items:center;gap:4px;width:100%;',
@@ -221,12 +222,15 @@ window.__ModuleLoader__.load({
       'border:0;background:0 0;font:inherit;',
       'text-align:left;color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:20px;',
       'overflow:hidden;user-select:none;cursor:pointer;border-radius:var(--dsw-radius-sm,4px)}',
-      '.dshUS-header:hover,',
-      '.dshUS-headerRow:hover .dshUS-header{color:var(--dsw-alias-label-secondary)}',
+      '.dshUS-headerRow:hover .dshUS-header{color:var(--dsw-alias-label-secondary);',
+      'background:var(--dsw-alias-interactive-bg-hover)}',
       '.dshUS-header:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:-2px}',
       '.dshUS-headerIcon{flex:none;display:inline-flex;align-items:center;justify-content:center;',
       'width:16px;height:20px;margin-right:calc(var(--dsh-sidebar-label-gap,6px) - 4px)}',
+      '.dshUS-headerDefaultIcon{display:inline-flex}',
+      '.dshUS-headerRow:hover .dshUS-headerDefaultIcon{display:none}',
+      '.dshUS-headerRow:hover .dshUS-arrow{display:inline-flex}',
       // The section's settings entry: the host's own gear, kept out of the way
       // until the header row is hovered or holds keyboard focus. It floats over
       // the header's empty right side, so the header keeps its full hit area and
@@ -248,12 +252,13 @@ window.__ModuleLoader__.load({
       '@media (hover:none){.dshUS-settingsButton{visibility:visible;opacity:1}}',
       '.dshUS-label{flex:none;min-width:0;overflow:hidden;text-overflow:ellipsis;',
       'white-space:nowrap}',
-      // A V-shaped chevron: points down when expanded, back right when collapsed,
-      // rotating on the host's own easing curve.
-      '.dshUS-arrow{flex:none;display:inline-flex;align-items:center;justify-content:center;',
+      // The native theme-aware triangle points right when collapsed and rotates
+      // down when expanded, using the same easing as workspace rows.
+      '.dshUS-arrow{flex:none;display:none;align-items:center;justify-content:center;',
+      'width:16px;height:16px;',
       'color:var(--dsw-alias-label-caption,currentColor);',
       'transition:transform .15s var(--ds-ease-in-out);transform:rotate(0deg)}',
-      '.dshUS-arrow[data-open="false"]{transform:rotate(-90deg)}',
+      '.dshUS-arrow[data-open="true"]{transform:rotate(90deg)}',
       '@media (prefers-reduced-motion:reduce){.dshUS-arrow{transition:none}}',
       // Like a top-level native session row, the title starts after the sidebar
       // row inset, a reserved status slot, and the sidebar label gap.
@@ -691,35 +696,6 @@ window.__ModuleLoader__.load({
           stroke: 'currentColor',
           strokeMiterlimit: 10,
         }),
-      );
-    }
-
-    /**
-     * The host's own V-shaped chevron, copied from the Client artifact so the
-     * section matches without importing a Client package.
-     * @param props - `open` turns it from pointing down to pointing right.
-     * @returns the chevron element.
-     */
-    function ChevronGlyph({ open }) {
-      return h(
-        'span',
-        { className: 'dshUS-arrow', 'data-open': open ? 'true' : 'false' },
-        h(
-          'svg',
-          {
-            width: 14,
-            height: 14,
-            viewBox: '0 0 16 16',
-            fill: 'none',
-            xmlns: 'http://www.w3.org/2000/svg',
-            'aria-hidden': 'true',
-            strokeWidth: 1,
-          },
-          h('path', {
-            d: 'M4 6L7.29289 9.29289C7.68342 9.68342 8.31658 9.68342 8.70711 9.29289L12 6',
-            stroke: 'currentColor',
-          }),
-        ),
       );
     }
 
@@ -1803,8 +1779,8 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * One collapsible section header, copied from the host's "Workspaces"
-     * header: the row itself is the toggle, the chevron states the direction,
+     * One collapsible section header, following native workspace rows:
+     * the row itself is the toggle, the left icon becomes a triangle on hover,
      * and the settings entry appears at the row's right edge on hover. The entry
      * is a sibling of the toggle rather than a child, because a button cannot
      * nest inside another button.
@@ -1835,9 +1811,18 @@ window.__ModuleLoader__.load({
             title: expanded ? collapseLabel : expandLabel,
             onClick: onToggle,
           },
-          h('span', { className: 'dshUS-headerIcon', 'aria-hidden': 'true' }, icon),
+          h(
+            'span',
+            { className: 'dshUS-headerIcon', 'aria-hidden': 'true' },
+            h('span', { className: 'dshUS-headerDefaultIcon' }, icon),
+            h(
+              'span',
+              { className: 'dshUS-arrow', 'data-open': expanded ? 'true' : 'false' },
+              // The shared symbol follows theme changes, including custom icons.
+              h(IconTriangleRightFillRegular),
+            ),
+          ),
           h('span', { className: 'dshUS-label' }, label),
-          h(ChevronGlyph, { open: expanded }),
         ),
         h(
           'button',
