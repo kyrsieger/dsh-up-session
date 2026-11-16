@@ -21,6 +21,7 @@ window.__ModuleLoader__.load({
       empty: '无置顶会话',
       recentEmpty: '无最近会话',
       showMore: '展开更多',
+      showMoreCount: '展开更多（{n}）',
       showLess: '收起',
       settings: '设置',
       settingsTitle: '设置',
@@ -109,6 +110,7 @@ window.__ModuleLoader__.load({
       empty: 'No pinned sessions',
       recentEmpty: 'No recent sessions',
       showMore: 'Show more',
+      showMoreCount: 'Show more ({n})',
       showLess: 'Show less',
       settings: 'Settings',
       settingsTitle: 'Settings',
@@ -341,13 +343,19 @@ window.__ModuleLoader__.load({
       '.dshUS-emptyLabel{flex:1;min-width:0;margin:0 6px 0;overflow:hidden;',
       'text-overflow:ellipsis;white-space:nowrap;font-size:14px;line-height:20px;',
       'color:var(--dsw-alias-label-tertiary)}',
-      // The host's own "Show more" row: one full-width 28px text button whose
-      // label lines up with the Session titles above it.
-      '.dshUS-more{box-sizing:border-box;display:block;width:100%;height:28px;margin:0;',
-      'padding:0 12px;border:0;border-radius:var(--dsw-radius-sm,4px);background:0 0;font:inherit;',
+      // Independent paging actions share the host's 28px row and title indent.
+      '.dshUS-pager{box-sizing:border-box;display:flex;align-items:center;min-width:0;',
+      'height:28px;padding:0 12px}',
+      '.dshUS-more{box-sizing:border-box;display:inline-flex;align-items:center;gap:0;min-width:0;',
+      'max-width:100%;height:28px;margin:0;padding:0;border:0;',
+      'border-radius:var(--dsw-radius-sm,4px);background:0 0;font:inherit;',
       'font-size:12px;line-height:18px;text-align:left;color:var(--dsw-alias-label-tertiary);',
-      'cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-      '.dshUS-empty,.dshUS-more{padding-left:calc(var(--dsh-sidebar-row-padding,12px) + ',
+      'cursor:pointer;white-space:nowrap}',
+      '.dshUS-moreLabel{min-width:0;overflow:hidden;text-overflow:ellipsis}',
+      '.dshUS-less{flex:none}',
+      '.dshUS-pageDivider{flex:none;width:1px;height:10px;margin:0 6px;',
+      'background:var(--dsw-alias-label-tertiary);opacity:.4}',
+      '.dshUS-empty,.dshUS-pager{padding-left:calc(var(--dsh-sidebar-row-padding,12px) + ',
       'var(--dshUS-status-width) + var(--dsh-sidebar-label-gap,6px))}',
       '.dshUS-more:hover{color:var(--dsw-alias-label-secondary)}',
       '.dshUS-more:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
@@ -691,6 +699,7 @@ window.__ModuleLoader__.load({
         ),
       );
     }
+
     /** No live status at all: what an older host that publishes no status feed looks like. */
     const NO_STATUSES = new Map();
     /** Stand-in for a host without the status hook, so the sections still render. */
@@ -1295,16 +1304,17 @@ window.__ModuleLoader__.load({
      * @param rowCount - how many recent Sessions there are.
      * @param limit - how many the list is currently allowed to show.
      * @param pageSize - how many rows show at rest.
-     * @returns the visible row count, whether every Session is on screen, and
-     *   the limit one click installs next.
+     * @returns the visible and remaining counts, whether the list can fold
+     *   back to its rest size, and the limit one show-more click installs next.
      */
     function recentWindow(rowCount, limit, pageSize) {
       const shown = Math.max(pageSize, limit);
-      const allShown = shown >= rowCount;
+      const visible = Math.min(shown, rowCount);
       return {
-        visible: Math.min(shown, rowCount),
-        allShown,
-        next: allShown ? pageSize : shown + RECENT_PAGE_STEP,
+        visible,
+        remaining: rowCount - visible,
+        canCollapse: visible > pageSize,
+        next: shown + RECENT_PAGE_STEP,
       };
     }
 
@@ -2115,8 +2125,8 @@ window.__ModuleLoader__.load({
     /**
      * The recent section: ordinary Sessions that are not pinned, newest
      * activity first, revealed from a configurable rest size. The header
-     * collapses the whole section; the footer button reveals five more, and
-     * once every Session is on screen it folds the list back to its rest size.
+     * collapses the whole section; independent footer actions reveal five
+     * more or fold all extra rows back to the rest size at any point.
      * @param props - the rows, the configured page size, row callbacks, and the translator.
      * @returns the section element.
      */
@@ -2149,15 +2159,32 @@ window.__ModuleLoader__.load({
       const pager =
         rows.length > pageSize
           ? h(
-              'button',
-              {
-                type: 'button',
-                className: 'dshUS-more',
-                'aria-expanded': page.allShown,
-                title: page.allShown ? t('showLess') : t('showMore'),
-                onClick: () => setLimit(page.next),
-              },
-              page.allShown ? t('showLess') : t('showMore'),
+              'div',
+              { className: 'dshUS-pager' },
+              page.remaining > 0 && h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'dshUS-more',
+                  title: t('showMoreCount', { n: page.remaining }),
+                  'aria-label': t('showMoreCount', { n: page.remaining }),
+                  onClick: () => setLimit(page.next),
+                },
+                h('span', { className: 'dshUS-moreLabel' }, t('showMoreCount', { n: page.remaining })),
+              ),
+              page.remaining > 0 && page.canCollapse && h(
+                'span', { className: 'dshUS-pageDivider', 'aria-hidden': 'true' },
+              ),
+              page.canCollapse && h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'dshUS-more dshUS-less',
+                  title: t('showLess'),
+                  onClick: () => setLimit(pageSize),
+                },
+                h('span', { className: 'dshUS-moreLabel' }, t('showLess')),
+              ),
             )
           : null;
       return h(

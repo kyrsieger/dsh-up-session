@@ -57,6 +57,10 @@ Open, archive, or unpin sessions directly, or use the context menu to manage the
 
 Lists unpinned sessions by most recent activity, without duplicating the Pinned section. By default, it shows the latest five sessions updated within the last seven days, with an option to show more. The display count and time range can be adjusted in Settings.
 
+“Show more” displays the total number of remaining sessions in parentheses and reveals up to five more at a time. Once expanded, a separate “Show less” action appears on its right and returns to the default count in one click. Only “Show less” remains when all sessions are visible; both actions disappear when the total is at or below the default count. Archiving and other changes update the list immediately, filling vacant places from the remaining sessions to maintain the current display count where possible.
+
+The footer uses two text buttons, “Show more (remaining count)” and “Show less”, separated by a thin vertical line. The count remains visible on hover.
+
 Open, archive, pin, or hide sessions from Recent, or use the context menu to manage them.
 
 ## Settings
