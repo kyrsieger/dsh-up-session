@@ -2092,7 +2092,9 @@ window.__ModuleLoader__.load({
         'section',
         { className: 'dshUS-root', 'aria-label': t('section') },
         h(SectionHeader, {
-          icon: h(PinGlyph, { size: 16 }),
+          // Match the native closed folder's ~55px² of painted area. The filled
+          // pin has ~76.5px² at size 16, so its header scale is sqrt(55.3/76.5).
+          icon: h(PinGlyph, { size: 13.6 }),
           label: t('section'),
           expanded,
           onToggle: toggleExpanded,
@@ -2202,7 +2204,9 @@ window.__ModuleLoader__.load({
         'section',
         { className: 'dshUS-root', 'aria-label': t('recent') },
         h(SectionHeader, {
-          icon: h(ClockGlyph, { size: 16 }),
+          // The outlined clock has ~58.7px² at size 16; use the same painted-area
+          // reference as Pinned while retaining the clock's original stroke.
+          icon: h(ClockGlyph, { size: 15.5 }),
           label: t('recent'),
           expanded,
           onToggle: toggleExpanded,
