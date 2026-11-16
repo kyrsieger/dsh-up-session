@@ -215,9 +215,9 @@ window.__ModuleLoader__.load({
       '.dshUS-headerRow{box-sizing:border-box;position:relative;display:flex;align-items:center;',
       'height:36px;margin:0 0 4px}',
       '.dshUS-header{box-sizing:border-box;display:flex;align-items:center;gap:4px;width:100%;',
-      // The mount's left edge matches the native header's. DSH uses the sidebar
-      // row padding for that header and shifts its label 1px back to the left.
-      'height:100%;margin:0;padding:0 4px 0 calc(var(--dsh-sidebar-row-padding,5px) - 1px);',
+      // Match a top-level workspace row: sidebar padding, a 16px icon slot,
+      // and the native label gap put both section names on the workspace title column.
+      'height:100%;margin:0;padding:0 4px 0 var(--dsh-sidebar-row-padding,12px);',
       'border:0;background:0 0;font:inherit;',
       'text-align:left;color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:20px;',
       'overflow:hidden;user-select:none;cursor:pointer;border-radius:var(--dsw-radius-sm,4px)}',
@@ -225,6 +225,8 @@ window.__ModuleLoader__.load({
       '.dshUS-headerRow:hover .dshUS-header{color:var(--dsw-alias-label-secondary)}',
       '.dshUS-header:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid ',
       'var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary,#4d6bfe));outline-offset:-2px}',
+      '.dshUS-headerIcon{flex:none;display:inline-flex;align-items:center;justify-content:center;',
+      'width:16px;height:20px;margin-right:calc(var(--dsh-sidebar-label-gap,6px) - 4px)}',
       // The section's settings entry: the host's own gear, kept out of the way
       // until the header row is hovered or holds keyboard focus. It floats over
       // the header's empty right side, so the header keeps its full hit area and
@@ -541,6 +543,27 @@ window.__ModuleLoader__.load({
           d: 'M6.05285 9.47511C6.27284 9.16094 6.70586 9.08458 7.02003 9.30457C7.3342 9.52455 7.41055 9.95757 7.19057 10.2717L3.98587 14.4708L3.21223 13.9291L6.05285 9.47511Z',
           fill: 'currentColor',
         }),
+      );
+    }
+
+    /** Clock marking the Recent section. */
+    function ClockGlyph({ size }) {
+      return h(
+        'svg',
+        {
+          width: size,
+          height: size,
+          viewBox: '0 0 16 16',
+          fill: 'none',
+          xmlns: 'http://www.w3.org/2000/svg',
+          'aria-hidden': 'true',
+          stroke: 'currentColor',
+          strokeWidth: 1.3,
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
+        },
+        h('circle', { cx: 8, cy: 8, r: 6 }),
+        h('path', { d: 'M8 4.5V8l2.5 1.5' }),
       );
     }
 
@@ -1785,10 +1808,11 @@ window.__ModuleLoader__.load({
      * and the settings entry appears at the row's right edge on hover. The entry
      * is a sibling of the toggle rather than a child, because a button cannot
      * nest inside another button.
-     * @param props - the visible label, the expanded state, the toggle, the labels naming the action, and the settings entry.
+     * @param props - the icon, the visible label, the expanded state, the toggle, the labels naming the action, and the settings entry.
      * @returns the header row.
      */
     function SectionHeader({
+      icon,
       label,
       expanded,
       onToggle,
@@ -1811,6 +1835,7 @@ window.__ModuleLoader__.load({
             title: expanded ? collapseLabel : expandLabel,
             onClick: onToggle,
           },
+          h('span', { className: 'dshUS-headerIcon', 'aria-hidden': 'true' }, icon),
           h('span', { className: 'dshUS-label' }, label),
           h(ChevronGlyph, { open: expanded }),
         ),
@@ -2082,6 +2107,7 @@ window.__ModuleLoader__.load({
         'section',
         { className: 'dshUS-root', 'aria-label': t('section') },
         h(SectionHeader, {
+          icon: h(PinGlyph, { size: 16 }),
           label: t('section'),
           expanded,
           onToggle: toggleExpanded,
@@ -2191,6 +2217,7 @@ window.__ModuleLoader__.load({
         'section',
         { className: 'dshUS-root', 'aria-label': t('recent') },
         h(SectionHeader, {
+          icon: h(ClockGlyph, { size: 16 }),
           label: t('recent'),
           expanded,
           onToggle: toggleExpanded,
